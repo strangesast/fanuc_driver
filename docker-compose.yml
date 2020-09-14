@@ -1,0 +1,14 @@
+version: '3.7'
+services:
+    main:
+        image: strangesast/hello-world-c
+        network_mode: 'host'
+        build:
+            context: .
+            args:
+                IMAGE: i386/debian
+                TARGETPLATFORM: linux/386
+#                IMAGE: debian
+#                TARGETPLATFORM: linux/amd64
+#                IMAGE: debian
+#                TARGETPLATFORM: linux/arm/v7
