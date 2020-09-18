@@ -1,0 +1,9 @@
+[submodule "json"]
+	path = json
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "external/fwlib"]
+	path = external/fwlib
+	url = https://github.com/strangesast/fwlib.git
+[submodule "external/cJSON"]
+	path = external/cJSON
+	url = https://github.com/DaveGamble/cJSON.git

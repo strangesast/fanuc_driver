@@ -1,0 +1,7 @@
+version: '3.7'
+services:
+  driver:
+    image: strangesast/fanuc_driver
+    network_mode: host
+    build:
+      context: .
