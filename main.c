@@ -1,748 +1,730 @@
+#include <math.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-#include <signal.h>
+#include <time.h>
 #include <unistd.h>
-#include <math.h>
-#include "./external/fwlib/fwlib32.h"
-#include "./external/cJSON/cJSON.h"
-#include "./external/librdkafka/src/rdkafka.h"
-#define MAXPATH 1024
-#define PART_COUNT_PARAMETER 6711
 
-char *AXIS_UNITH[] = {"mm", "inch", "degree", "mm/minute", "inch/minute", "rpm", "mm/round", "inch/round", "%", "Ampere", "Second"};
-char *MACHINE_EXECUTION[] = {"ACTIVE", "INTERRUPTED", "STOPPED", "READY"};
-char *MACHINE_MODE[] = {"MANUAL", "MANUAL_DATA_INPUT", "AUTOMATIC"};
-char *MACHINE_ESTOP[] = {"TRIGGERED", "ARMED"};
+#include "./data.h"
+#include "./external/cJSON/cJSON.h"
+#include "./external/fwlib/fwlib32.h"
+#include "./external/librdkafka/src/rdkafka.h"
+
+#define MAXPATH 1024
+#define BILLION 1000000000.0
 
 short unsigned int fLibHandle;
 
-char mDeviceIP[MAXPATH] = "";
-int mDevicePort;
+char deviceIP[MAXPATH] = "127.0.0.1";
+char deviceID[128];
+char machineName[128];
+short programNum = 0;
+long partCount = -1;
+int devicePort = 8193;
 
 static volatile int runningCondition = 0;
 
-bool jsonEqual(cJSON *a, cJSON *b)
-{
-  return strcmp(cJSON_PrintUnformatted(a), cJSON_PrintUnformatted(b)) == 0;
+bool jsonEqual(cJSON *a, cJSON *b) {
+  char *aa = cJSON_PrintUnformatted(a);
+  char *bb = cJSON_PrintUnformatted(b);
+  bool eql = strcmp(aa, bb) == 0;
+  free(aa);
+  free(bb);
+  return eql;
 }
 
-// get machine properties (unique id, characteristics, software versions)
-int readMachineInfo(cJSON *datum, double axesDivisors[MAX_AXIS])
-{
-  short ret;
-  short etherType;
-  short etherDevice;
-  short pathNumber = 0;
-  short len = MAX_AXIS;
-  short axisCount = MAX_AXIS;
-  short count;
-  short types[] = {1 /* actual position */};
-  short inprec[MAX_AXIS];
-  short outprec[MAX_AXIS];
-  const int num = 1;
-  char buf[36];
-  unsigned long cncIDs[4];
-  ODBSYS sysinfo;
-  ODBAXDT axisData[MAX_AXIS * num];
-  ODBAXISNAME axes[MAX_AXIS];
+void jsonDebug(char *ref, cJSON *o) {
+  char *string = cJSON_Print(o);
+  printf("%s%s\n", ref, string);
+  free(string);
+}
 
-  ret = cnc_sysinfo(fLibHandle, &sysinfo);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to get cnc sysinfo!\n");
-    return 1;
-  }
+int serializeMachineInfo(MachineInfo *v, cJSON *datum) {
+  cJSON *info_datum = cJSON_CreateObject();
 
-  ret = cnc_rdcncid(fLibHandle, cncIDs);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to get cnc id!\n");
-    return 1;
-  }
-
-  ret = cnc_rdetherinfo(fLibHandle, &etherType, &etherDevice);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to get cnc ether info!\n");
-    return 1;
-  }
-
-  // machine id
-  sprintf(buf, "%08lx-%08lx-%08lx-%08lx", cncIDs[0] & 0xffffffff, cncIDs[1] & 0xffffffff, cncIDs[2] & 0xffffffff, cncIDs[3] & 0xffffffff);
-  cJSON *id_datum = cJSON_CreateString(buf);
-  if (id_datum == NULL)
-  {
+  cJSON *id_datum = cJSON_CreateString(v->id);
+  if (id_datum == NULL) {
     fprintf(stderr, "failed to allocate id\n");
     return 1;
   }
-  cJSON_AddItemToObject(datum, "id", id_datum);
+  cJSON_AddItemToObject(info_datum, "id", id_datum);
 
-  // max_axis
-  cJSON *max_axis_datum = cJSON_CreateNumber(sysinfo.max_axis);
-  if (max_axis_datum == NULL)
-  {
+  cJSON *max_axis_datum = cJSON_CreateNumber(v->max_axis);
+  if (max_axis_datum == NULL) {
     fprintf(stderr, "failed to allocate max_axis\n");
     return 1;
   }
-  cJSON_AddItemToObject(datum, "max_axis", max_axis_datum);
+  cJSON_AddItemToObject(info_datum, "max_axis", max_axis_datum);
 
-  // addinfo
-  cJSON *addinfo_datum = cJSON_CreateNumber(sysinfo.addinfo);
-  if (addinfo_datum == NULL)
-  {
+  cJSON *addinfo_datum = cJSON_CreateNumber(v->addinfo);
+  if (addinfo_datum == NULL) {
     fprintf(stderr, "failed to allocate addinfo\n");
     return 1;
   }
-  cJSON_AddItemToObject(datum, "addinfo", addinfo_datum);
+  cJSON_AddItemToObject(info_datum, "addinfo", addinfo_datum);
 
-  // cnc_type
-  sprintf(buf, "%.2s", sysinfo.cnc_type);
-  cJSON *cnc_type_datum = cJSON_CreateString(buf);
-  if (cnc_type_datum == NULL)
-  {
+  cJSON *cnc_type_datum = cJSON_CreateString(v->cnc_type);
+  if (cnc_type_datum == NULL) {
     fprintf(stderr, "failed to allocate cnc_type\n");
+    return 1;
   }
-  cJSON_AddItemToObject(datum, "cnc_type", cnc_type_datum);
+  cJSON_AddItemToObject(info_datum, "cnc_type", cnc_type_datum);
 
-  // mt_type
-  sprintf(buf, "%.2s", sysinfo.mt_type);
-  cJSON *mt_type_datum = cJSON_CreateString(buf);
-  if (mt_type_datum == NULL)
-  {
+  cJSON *mt_type_datum = cJSON_CreateString(v->mt_type);
+  if (mt_type_datum == NULL) {
     fprintf(stderr, "failed to allocate mt_type\n");
+    return 1;
   }
-  cJSON_AddItemToObject(datum, "mt_type", mt_type_datum);
+  cJSON_AddItemToObject(info_datum, "mt_type", mt_type_datum);
 
-  // series_datum
-  sprintf(buf, "%.4s", sysinfo.series);
-  cJSON *series_datum = cJSON_CreateString(buf);
-  if (series_datum == NULL)
-  {
+  cJSON *series_datum = cJSON_CreateString(v->series);
+  if (series_datum == NULL) {
     fprintf(stderr, "failed to allocate series\n");
+    return 1;
   }
-  cJSON_AddItemToObject(datum, "series", series_datum);
+  cJSON_AddItemToObject(info_datum, "series", series_datum);
 
-  sprintf(buf, "%.4s", sysinfo.version);
-  cJSON *version_datum = cJSON_CreateString(buf);
-  if (version_datum == NULL)
-  {
+  cJSON *version_datum = cJSON_CreateString(v->version);
+  if (version_datum == NULL) {
     fprintf(stderr, "failed to allocate version\n");
-  }
-  cJSON_AddItemToObject(datum, "version", version_datum);
-
-  sprintf(buf, "%.2s", sysinfo.axes);
-  cJSON *axes_count_datum = cJSON_CreateString(buf);
-  if (axes_count_datum == NULL)
-  {
-    fprintf(stderr, "failed to allocate axes\n");
-  }
-  cJSON_AddItemToObject(datum, "axes_count", axes_count_datum);
-
-  ret = cnc_rdaxisdata(fLibHandle, 1 /* Position Value */, (short *)types, num, &len, axisData);
-  bool hasAxisData = ret == EW_OK;
-  if (!hasAxisData)
-  {
-    fprintf(stderr, "cnc_rdaxisdata returned %d for path %d\n", ret, pathNumber);
-  }
-
-  ret = cnc_getfigure(fLibHandle, 0, &count, inprec, outprec);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Failed to get axis scale: %d\n", ret);
     return 1;
   }
+  cJSON_AddItemToObject(info_datum, "version", version_datum);
 
-  cJSON *axesDatum = cJSON_CreateArray();
+  cJSON *axes_count_datum = cJSON_CreateNumber(v->axes_count);
+  if (axes_count_datum == NULL) {
+    fprintf(stderr, "failed to allocate axes_count\n");
+    return 1;
+  }
+  cJSON_AddItemToObject(info_datum, "axes_count", axes_count_datum);
 
-  ret = cnc_rdaxisname(fLibHandle, &axisCount, axes);
-  if (ret == EW_OK)
-  {
-    int i = 0;
-    for (i = 0; i < axisCount; i++)
-    {
-      cJSON *axisDatum = cJSON_CreateObject();
+  cJSON *axes_count_chk_datum = cJSON_CreateString(v->axes_count_chk);
+  if (axes_count_chk_datum == NULL) {
+    fprintf(stderr, "failed to allocate axes_count_chk\n");
+    return 1;
+  }
+  cJSON_AddItemToObject(info_datum, "axes_count_chk", axes_count_chk_datum);
 
-      double divisor = pow((long double)10.0, (long double)inprec[i]);
-      axesDivisors[i] = divisor;
+  cJSON *ether_type_datum = cJSON_CreateNumber(v->etherType);
+  if (ether_type_datum == NULL) {
+    fprintf(stderr, "failed to allocate ether_type\n");
+    return 1;
+  }
+  cJSON_AddItemToObject(info_datum, "ether_type", ether_type_datum);
 
-      sprintf(buf, "%c", axes[i].name);
-      cJSON *id_datum = cJSON_CreateString(buf);
-      cJSON_AddItemToObject(axisDatum, "id", id_datum);
+  cJSON *ether_device_datum = cJSON_CreateNumber(v->etherDevice);
+  if (ether_device_datum == NULL) {
+    fprintf(stderr, "failed to allocate ether_device\n");
+    return 1;
+  }
+  cJSON_AddItemToObject(info_datum, "ether_device", ether_device_datum);
 
-      cJSON *index_datum = cJSON_CreateNumber(i);
-      cJSON_AddItemToObject(axisDatum, "index", index_datum);
+  cJSON *axes_datum = cJSON_CreateArray();
 
-      sprintf(buf, "%c", axes[i].suff);
-      cJSON *suffix_datum = cJSON_CreateString(buf);
-      cJSON_AddItemToObject(axisDatum, "suffix", suffix_datum);
+  for (int i = 0; i < v->axes_count; i++) {
+    cJSON *axis_datum = cJSON_CreateObject();
 
-      cJSON *divisor_datum = cJSON_CreateNumber(divisor);
-      cJSON_AddItemToObject(axisDatum, "divisor", divisor_datum);
-
-      if (hasAxisData)
-      {
-        char name[5];
-        memset(name, '\0', sizeof(name));
-        strncpy(name, axisData[i].name, 4);
-
-        cJSON *name_datum = cJSON_CreateString(name);
-        cJSON_AddItemToObject(axisDatum, "name", name_datum);
-
-        cJSON *flag_datum = cJSON_CreateNumber(axisData[i].flag);
-        cJSON_AddItemToObject(axisDatum, "flag", flag_datum);
-
-        short unit = axisData[i].unit;
-        cJSON *unit_datum = cJSON_CreateNumber(unit);
-        cJSON_AddItemToObject(axisDatum, "unit", unit_datum);
-
-        char *unith = AXIS_UNITH[unit];
-        cJSON *unith_datum = cJSON_CreateString(unith);
-        cJSON_AddItemToObject(axisDatum, "unith", unith_datum);
-
-        cJSON *decimal_datum = cJSON_CreateNumber(axisData[i].dec);
-        cJSON_AddItemToObject(axisDatum, "decimal", decimal_datum);
-      }
-      cJSON_AddItemToArray(axesDatum, axisDatum);
+    cJSON *axis_id_datum = cJSON_CreateString(v->axes[i].id);
+    if (axis_id_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_id %d\n", i);
+      return 1;
     }
-  }
-  else
-  {
-    fprintf(stderr, "Failed to get axis names: %d\n", ret);
-    return 1;
-  }
+    cJSON_AddItemToObject(axis_datum, "id", axis_id_datum);
 
-  cJSON_AddItemToObject(datum, "axes", axesDatum);
-
-  return 0;
-}
-
-int checkMachineInfo(cJSON *updatesArray, double axesDivisors[MAX_AXIS])
-{
-  static cJSON *last = NULL; // last value pointer, freed on process exit
-  cJSON *next = cJSON_CreateObject();
-  if (readMachineInfo(next, axesDivisors))
-  {
-    fprintf(stderr, "failed to read machine info!\n");
-    exit(EXIT_FAILURE);
-    return 1;
-  }
-  if (last == NULL)
-  {
-    // pass
-  }
-  else if (!jsonEqual(last, next))
-  {
-    cJSON_Delete(last);
-  }
-  else
-  {
-    cJSON_Delete(next);
-    return 0;
-  }
-  cJSON_AddItemReferenceToArray(updatesArray, next);
-  last = next;
-
-  return 0;
-}
-
-struct MachineMessage
-{
-  short number;
-  char text[256];
-};
-
-int getMachineMessage(bool *changed, struct MachineMessage *next)
-{
-  static struct MachineMessage last = {};
-  OPMSG message;
-  short ret = cnc_rdopmsg(fLibHandle, 0, 6 + 256, &message);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to read operator message: %d\n", ret);
-    return 1;
-  }
-  *changed = (last.number != message.datano) || !strcmp(last.text, message.data);
-  last.number = message.datano;
-  size_t l = sizeof(last.text);
-  strncpy(last.text, message.data, l);
-  last.text[l - 1] = '\0';
-  *next = last;
-  return 0;
-}
-
-int readMachineMessage(cJSON *datum)
-{
-  bool *changed = false;
-  struct MachineMessage *v;
-  if (getMachineMessage(changed, v))
-  {
-    fprintf(stderr, "failed to read machine message!\n");
-    return 1;
-  }
-  if (changed) {
-    if (v->number != -1) {
-      cJSON *message_datum = cJSON_CreateObject();
-      cJSON *num_datum = cJSON_CreateNumber(v->datano);
-      cJSON_AddItemToObject(message_datum, "num", num_datum);
-      cJSON *text_datum = cJSON_CreateString(v->text);
-      cJSON_AddItemToObject(message_datum, "text", text_datum);
-      cJSON_AddItemToObject(datum, "message", message_datum);
-    } else {
-      cJSON_AddItemToObject(datum, "message", message_datum);
+    cJSON *axis_index_datum = cJSON_CreateNumber(i);
+    if (axis_index_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_index %d\n", i);
+      return 1;
     }
+    cJSON_AddItemToObject(axis_datum, "index", axis_index_datum);
+
+    cJSON *axis_suffix_datum = cJSON_CreateString(v->axes[i].suffix);
+    if (axis_suffix_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_suffix %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "suffix", axis_suffix_datum);
+
+    cJSON *axis_divisor_datum = cJSON_CreateNumber(v->axes[i].divisor);
+    if (axis_divisor_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_divisor %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "divisor", axis_divisor_datum);
+
+    cJSON *axis_name_datum = cJSON_CreateString(v->axes[i].name);
+    if (axis_name_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_name %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "name", axis_name_datum);
+
+    cJSON *axis_flag_datum = cJSON_CreateNumber(v->axes[i].flag);
+    if (axis_flag_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_flag %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "flag", axis_flag_datum);
+
+    cJSON *axis_unit_datum = cJSON_CreateNumber(v->axes[i].unit);
+    if (axis_unit_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_unit %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "unit", axis_unit_datum);
+
+    cJSON *axis_unith_datum = cJSON_CreateString(v->axes[i].unith);
+    if (axis_unith_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_unith %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "unith", axis_unith_datum);
+
+    cJSON *axis_decimal_datum = cJSON_CreateNumber(v->axes[i].decimal);
+    if (axis_decimal_datum == NULL) {
+      fprintf(stderr, "failed to allocate axis_decimal %d\n", i);
+      return 1;
+    }
+    cJSON_AddItemToObject(axis_datum, "decimal", axis_decimal_datum);
+
+    cJSON_AddItemToArray(axes_datum, axis_datum);
   }
+
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(info_datum, "axes", axes_datum);
+  cJSON_AddItemToObject(meta_datum, "meta", meta_datum);
+  cJSON_AddItemToObject(datum, "machine", info_datum);
 
   return 0;
 }
 
-struct MachineStatus
-{
-  short alarm;
-  short aut;
-  short edit;
-  short emergency;
-  short hdck;
-  short motion;
-  short mstb;
-  short run;
-}
+int checkMachineInfo(cJSON *updates) {
+  static MachineInfo *lv = NULL;
+  static cJSON *last = NULL;
 
-int
-getMachineStatus(bool *changed, struct MachineStatus *next)
-{
-  static struct MachineStatus last = {};
-  short ret;
-  ODBST status;
+  MachineInfo *v;
+  v = malloc(sizeof(MachineInfo));
 
-  ret = cnc_statinfo(fLibHandle, &status);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Cannot cnc_statinfo: %d", ret);
+  // check new value
+  if (getMachineInfo(v)) {
+    free(v);
+    fprintf(stderr, "failed to get machine info\n");
     return 1;
   }
-  /*
-     ODBALM alarm;
-     ret = cnc_alarm(mFlibHndl, &alarm);
-     if (ret != EW_OK)
-     {
-     fprintf(stderr, "failed to get alarm data!\n");
-     exit(EXIT_FAILURE);
-     return 1;
-     }
-     printf("ALARM %d\n", alarm.data);
+  strncpy(deviceID, v->id, 128);
 
-     ALMINFO alarminfo;
-     ret = cnc_rdalminfo(mFlibHndl, 1, short alm_type, short length, &alarminfo)
-  */
-  *changed = (last.alarm != status.alarm) || (last.aut != status.aut) || (last.edit != status.edit) || (last.emergency != status.emergency) || (last.hdck != status.hdck) || (last.motion != status.motion) || (last.mstb != status.mstb) || (last.run != status.run);
-  last.alarm = status.alarm;
-  last.aut = status.aut;
-  last.edit = status.edit;
-  last.emergency = status.emergency;
-  last.hdck = status.hdck;
-  last.motion = status.motion;
-  last.mstb = status.mstb;
-  last.run = status.run;
-  *next = last;
+  // if changed or first call
+  if (lv == NULL ||
+      (lv->id != v->id || lv->max_axis != v->max_axis ||
+       lv->addinfo != v->addinfo || lv->cnc_type != v->cnc_type ||
+       lv->mt_type != v->mt_type || lv->series != v->series ||
+       lv->version != v->version || lv->axes_count_chk != v->axes_count_chk ||
+       lv->axes_count != v->axes_count || lv->etherType != v->etherType ||
+       lv->etherDevice != v->etherDevice)) {
+    if (lv != NULL) {
+      free(lv);            // free old version
+      cJSON_Delete(last);  // free old json
+    }
+    // update to new version
+    lv = v;
+    last = cJSON_CreateObject();
+    // serialize into json
+    if (serializeMachineInfo(lv, last)) {
+      fprintf(stderr, "failed to serialize machine info\n");
+      return 1;
+    }
+    cJSON_AddItemReferenceToArray(updates, last);
+  } else {
+    // it's unchanged, so free new version
+    free(v);
+  }
   return 0;
 }
 
-int readMachineStatus(cJSON *datum)
-{
-  bool *changed = false;
-  struct MachineStatus *v;
-  if (getMachineStatus(changed, v))
-  {
+int serializeMachinePartCount(MachinePartCount *v, cJSON *datum) {
+  if (getMachinePartCount(v)) {
+    fprintf(stderr, "failed to get machine part count\n");
+    return 1;
+  }
+
+  cJSON *part_count_datum = cJSON_CreateObject();
+  cJSON *count = cJSON_CreateNumber(v->count);
+  cJSON_AddItemToObject(part_count_datum, "count", count);
+
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(datum, "part_count", part_count_datum);
+  cJSON_AddItemToObject(datum, "meta", meta_datum);
+
+  return 0;
+}
+
+int checkMachinePartCount(cJSON *updates) {
+  static MachinePartCount *lv = NULL;
+  static cJSON *last = NULL;
+
+  MachinePartCount *v;
+  v = malloc(sizeof(MachinePartCount));
+
+  if (getMachinePartCount(v)) {
+    fprintf(stderr, "failed to read machine part count\n");
+    return 1;
+  }
+
+  if (lv == NULL || (lv->count != v->count)) {
+    if (lv != NULL) {
+      free(lv);
+      cJSON_Delete(last);
+    }
+
+    lv = v;
+    last = cJSON_CreateObject();
+
+    if (serializeMachinePartCount(lv, last)) {
+      fprintf(stderr, "failed to serialize part count\n");
+      return 1;
+    }
+    cJSON_AddItemReferenceToArray(updates, last);
+
+  } else {
+    free(v);
+  }
+
+  return 0;
+}
+
+int serializeMachineMessage(MachineMessage *v, cJSON *datum) {
+  cJSON *message_datum;
+  if (v->number != -1) {
+    message_datum = cJSON_CreateObject();
+
+    cJSON *num_datum = cJSON_CreateNumber(v->number);
+    cJSON_AddItemToObject(message_datum, "num", num_datum);
+
+    cJSON *text_datum = cJSON_CreateString(v->text);
+    cJSON_AddItemToObject(message_datum, "text", text_datum);
+  } else {
+    message_datum = cJSON_CreateNull();
+  }
+
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(datum, "meta", meta_datum);
+  cJSON_AddItemToObject(datum, "message", message_datum);
+
+  return 0;
+}
+
+int checkMachineMessage(cJSON *updates) {
+  static MachineMessage *lv = NULL;
+  static cJSON *last = NULL;
+
+  MachineMessage *v;
+  v = malloc(sizeof(MachineMessage));
+
+  if (getMachineMessage(v)) {
+    free(v);
+    fprintf(stderr, "failed to read machine message\n");
+    return 1;
+  }
+
+  if (lv == NULL ||
+      (lv->number != v->number || strcmp(lv->text, v->text) != 0)) {
+    if (lv != NULL) {
+      free(lv);
+      cJSON_Delete(last);
+    }
+
+    lv = v;
+    last = cJSON_CreateObject();
+
+    if (serializeMachineMessage(lv, last)) {
+      fprintf(stderr, "failed to serialize machine message\n");
+      return 1;
+    }
+    cJSON_AddItemReferenceToArray(updates, last);
+  } else {
+    free(v);
+  }
+  return 0;
+}
+
+int serializeMachineStatus(cJSON *datum) {
+  struct MachineStatus v;
+  if (getMachineStatus(&v)) {
     fprintf(stderr, "failed to read machine status!\n");
     return 1;
   }
-  if (changed)
-  {
-    char *execution = MACHINE_EXECUTION[(v->run == 3 || v->run == 4) ? 0 : (v->run == 2 || v->motion == 2 || v->mstb != 0) ? 1 : v->run == 0 ? 2 : 3];
-    cJSON *execution_datum = cJSON_CreateString(execution);
-    cJSON_AddItemToObject(datum, "execution", execution_datum);
+  cJSON *status_datum = cJSON_CreateObject();
+  cJSON *execution_datum = cJSON_CreateString(v.execution);
+  cJSON_AddItemToObject(status_datum, "execution", execution_datum);
 
-    char *mode = MACHINE_MODE[(v->aut == 5 || v->aut == 6) ? 0 : (v->aut == 0 || v->aut == 3) ? 1 : 2];
-    cJSON *mode_datum = cJSON_CreateString(mode);
-    cJSON_AddItemToObject(datum, "mode", mode_datum);
+  cJSON *mode_datum = cJSON_CreateString(v.mode);
+  cJSON_AddItemToObject(status_datum, "mode", mode_datum);
 
-    char *estop = MACHINE_ESTOP[v->emergency == 1 ? 0 : 1];
-    cJSON *estop_datum = cJSON_CreateString(estop);
-    cJSON_AddItemToObject(datum, "estop", estop_datum);
+  cJSON *estop_datum = cJSON_CreateString(v.estop);
+  cJSON_AddItemToObject(status_datum, "estop", estop_datum);
 
-    cJSON *raw_datum = cJSON_CreateObject();
+  cJSON *raw_datum = cJSON_CreateObject();
 
-    cJSON *aut_datum = cJSON_CreateNumber(v->aut);
-    cJSON_AddItemToObject(raw_datum, "aut", aut_datum);
+  cJSON *aut_datum = cJSON_CreateNumber(v.raw.aut);
+  cJSON_AddItemToObject(raw_datum, "aut", aut_datum);
 
-    cJSON *run_datum = cJSON_CreateNumber(v->run);
-    cJSON_AddItemToObject(raw_datum, "run", run_datum);
+  cJSON *run_datum = cJSON_CreateNumber(v.raw.run);
+  cJSON_AddItemToObject(raw_datum, "run", run_datum);
 
-    cJSON *edit_datum = cJSON_CreateNumber(v->edit);
-    cJSON_AddItemToObject(raw_datum, "edit", edit_datum);
+  cJSON *edit_datum = cJSON_CreateNumber(v.raw.edit);
+  cJSON_AddItemToObject(raw_datum, "edit", edit_datum);
 
-    cJSON *motion_datum = cJSON_CreateNumber(v->motion);
-    cJSON_AddItemToObject(raw_datum, "motion", motion_datum);
+  cJSON *motion_datum = cJSON_CreateNumber(v.raw.motion);
+  cJSON_AddItemToObject(raw_datum, "motion", motion_datum);
 
-    cJSON *mstb_datum = cJSON_CreateNumber(v->mstb);
-    cJSON_AddItemToObject(raw_datum, "mstb", mstb_datum);
+  cJSON *mstb_datum = cJSON_CreateNumber(v.raw.mstb);
+  cJSON_AddItemToObject(raw_datum, "mstb", mstb_datum);
 
-    cJSON *emergency_datum = cJSON_CreateNumber(v->emergency);
-    cJSON_AddItemToObject(raw_datum, "emergency", emergency_datum);
+  cJSON *emergency_datum = cJSON_CreateNumber(v.raw.emergency);
+  cJSON_AddItemToObject(raw_datum, "emergency", emergency_datum);
 
-    cJSON *alarm_datum = cJSON_CreateNumber(v->alarm);
-    cJSON_AddItemToObject(raw_datum, "alarm", alarm_datum);
+  cJSON *alarm_datum = cJSON_CreateNumber(v.raw.alarm);
+  cJSON_AddItemToObject(raw_datum, "alarm", alarm_datum);
 
-    cJSON_AddItemToObject(datum, "raw", raw_datum);
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v.executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(status_datum, "raw", raw_datum);
+
+  cJSON_AddItemToObject(datum, "meta", meta_datum);
+  cJSON_AddItemToObject(datum, "status", status_datum);
+
+  return 0;
+}
+
+int checkMachineStatus(cJSON *updates) {
+  static MachineStatus *lv = NULL;
+  static cJSON *last = NULL;
+
+  MachineStatus *v;
+  v = malloc(sizeof(MachineStatus));
+
+  if (getMachineStatus(v)) {
+    free(v);
+    fprintf(stderr, "failed to read machine status\n");
+    return 1;
+  }
+
+  if (lv == NULL ||
+      (lv->raw.alarm != v->raw.alarm || lv->raw.aut != v->raw.aut ||
+       lv->raw.edit != v->raw.edit || lv->raw.emergency != v->raw.emergency ||
+       lv->raw.hdck != v->raw.hdck || lv->raw.motion != v->raw.motion ||
+       lv->raw.mstb != v->raw.mstb || lv->raw.run != v->raw.run)) {
+    if (lv != NULL) {
+      free(lv);
+      cJSON_Delete(last);
+    }
+
+    lv = v;
+    last = cJSON_CreateObject();
+
+    if (serializeMachineStatus(last)) {
+      fprintf(stderr, "failed to serialize machine status\n");
+      return 1;
+    }
+    cJSON_AddItemReferenceToArray(updates, last);
+  } else {
+    free(v);
   }
 
   return 0;
 }
 
-struct MachinePartCount
-{
-  long count;
-  long minutes;
-  long milliseconds;
-};
-
-int getMachinePartCount(bool *changed, struct MachinePartCount *next)
-{
-  static struct MachinePartCount last = {};
-  short ret;
-  short timeType = 3; // 0->Power on time, 1->Operating time, 2->Cutting time, 3->Cycle time, 4->Free purpose,
-  IODBTIME time;
-  IODBPSD param;
-
-  ret = cnc_rdparam(fLibHandle, PART_COUNT_PARAMETER, -1, 8, &param);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Failed to read part parameter!\n");
-    return 1;
-  }
-
-  ret = cnc_rdtimer(fLibHandle, timeType, &time);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to get time for type %d!\n", timeType);
-    return 1;
-  }
-
-  *changed = (last.count != param.u.ldata) || (last.minutes != time.minute) || (last.milliseconds != time.msec);
-  last.count = param.u.ldata;
-  last.minutes = time.minute;
-  last.milliseconds = time.msec;
-  *next = last;
-
-  return 0;
-}
-
-int readMachinePartCount(cJSON *datum)
-{
-  bool *changed = false;
-  struct MachinePartCount *v;
-  if (getMachinePartCount(changed, v))
-  {
-    fprintf(stderr, "failed to read machine part count data!\n");
-    return 1;
-  }
-  if (changed)
-  {
-    // count
-    cJSON *count_datum = cJSON_CreateNumber(v->count);
-    cJSON_AddItemToObject(datum, "count", count_datum);
-
-    // cycle time
-    cJSON *cycle_time_datum = cJSON_CreateObject();
-
-    // milliseconds
-    long milliseconds = v->milliseconds + v->minutes * 60 * 1000;
-    cJSON *milliseconds_datum = cJSON_CreateNumber(milliseconds);
-    cJSON_AddItemToObject(cycle_time_datum, "milliseconds", milliseconds_datum);
-
-    cJSON *raw_cycle_time_datum = cJSON_CreateObject();
-    // raw minutes
-    cJSON *raw_minutes_datum = cJSON_CreateNumber(v->minutes);
-    cJSON_AddItemToObject(raw_cycle_time_datum, "minutes", raw_minutes_datum);
-
-    // raw milliseconds
-    cJSON *raw_milliseconds_datum = cJSON_CreateNumber(v->milliseconds);
-    cJSON_AddItemToObject(raw_cycle_time_datum, "milliseconds", raw_milliseconds_datum);
-
-    cJSON_AddItemToObject(cycle_time_datum, "raw", raw_cycle_time_datum);
-    cJSON_AddItemToObject(datum, "last_cycle_time", cycle_time_datum);
-  }
-  return 0;
-}
-
-int readMachineDynamic(cJSON *datum, double divisors[MAX_AXIS], long *programNum)
-{
-  short ret;
-  ODBDY2 dyn;
-  ODBSVLOAD axLoad[MAX_AXIS];
-  short num = MAX_AXIS;
-
-  // alarm status, program number, sequence number, actual feed rate,
-  // actual spindle speed, absolute/machine/relative position, distance to go
-  ret = cnc_rddynamic2(fLibHandle, -1, sizeof(dyn), &dyn);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to get cnc dyn data!\n");
-    return 1;
-  }
-
-  // servo load
-  ret = cnc_rdsvmeter(fLibHandle, &num, axLoad);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "cnc_rdsvmeter failed: %d\n", ret);
-    return 1;
-  }
-
+int serializeMachineDynamic(MachineDynamic *v, cJSON *datum) {
+  cJSON *dynamic_datum = cJSON_CreateObject();
   cJSON *absolute_datum = cJSON_CreateArray();
   cJSON *relative_datum = cJSON_CreateArray();
   cJSON *actual_datum = cJSON_CreateArray();
   cJSON *load_datum = cJSON_CreateArray();
 
   int i = 0;
-  for (i = 0; i < num; i++)
-  {
-    double absolute = dyn.pos.faxis.absolute[i] / divisors[i];
-    cJSON *each_absolute_datum = cJSON_CreateNumber(absolute);
+  for (i = 0; i < v->dim; i++) {
+    cJSON *each_absolute_datum = cJSON_CreateNumber(v->absolute[i]);
     cJSON_AddItemToArray(absolute_datum, each_absolute_datum);
-
-    double relative = dyn.pos.faxis.relative[i] / divisors[i];
-    cJSON *each_relative_datum = cJSON_CreateNumber(relative);
+    cJSON *each_relative_datum = cJSON_CreateNumber(v->relative[i]);
     cJSON_AddItemToArray(relative_datum, each_relative_datum);
-
-    double actual = dyn.pos.faxis.machine[i] / divisors[i];
-    cJSON *each_actual_datum = cJSON_CreateNumber(actual);
+    cJSON *each_actual_datum = cJSON_CreateNumber(v->actual[i]);
     cJSON_AddItemToArray(actual_datum, each_actual_datum);
-
-    double load = axLoad[i].svload.data / pow(10.0, axLoad[i].svload.dec);
-    cJSON *each_load_datum = cJSON_CreateNumber(load);
+    cJSON *each_load_datum = cJSON_CreateNumber(v->load[i]);
     cJSON_AddItemToArray(load_datum, each_load_datum);
   }
 
-  cJSON_AddItemToObject(datum, "absolute", absolute_datum);
-  cJSON_AddItemToObject(datum, "actual", actual_datum);
-  cJSON_AddItemToObject(datum, "load", load_datum);
+  cJSON_AddItemToObject(dynamic_datum, "absolute", absolute_datum);
+  cJSON_AddItemToObject(dynamic_datum, "relative", relative_datum);
+  cJSON_AddItemToObject(dynamic_datum, "actual", actual_datum);
+  cJSON_AddItemToObject(dynamic_datum, "load", load_datum);
 
-  *programNum = dyn.prgnum;
   // current program
-  cJSON *cprogram_datum = cJSON_CreateNumber(dyn.prgnum);
-  cJSON_AddItemToObject(datum, "cprogram", cprogram_datum);
+  cJSON *cprogram_datum = cJSON_CreateNumber(v->cprogram);
+  cJSON_AddItemToObject(dynamic_datum, "cprogram", cprogram_datum);
 
   // main program
-  cJSON *mprogram_datum = cJSON_CreateNumber(dyn.prgmnum);
-  cJSON_AddItemToObject(datum, "mprogram", mprogram_datum);
+  cJSON *mprogram_datum = cJSON_CreateNumber(v->mprogram);
+  cJSON_AddItemToObject(dynamic_datum, "mprogram", mprogram_datum);
 
   // line no
-  cJSON *sequence_datum = cJSON_CreateNumber(dyn.seqnum);
-  cJSON_AddItemToObject(datum, "sequence", sequence_datum);
+  cJSON *sequence_datum = cJSON_CreateNumber(v->sequence);
+  cJSON_AddItemToObject(dynamic_datum, "sequence", sequence_datum);
 
   // actual feedrate
-  cJSON *actf_datum = cJSON_CreateNumber(dyn.actf);
-  cJSON_AddItemToObject(datum, "actf", actf_datum);
+  cJSON *actf_datum = cJSON_CreateNumber(v->actf);
+  cJSON_AddItemToObject(dynamic_datum, "actf", actf_datum);
 
   // actual spindle speed
-  cJSON *acts_datum = cJSON_CreateNumber(dyn.acts);
-  cJSON_AddItemToObject(datum, "acts", acts_datum);
+  cJSON *acts_datum = cJSON_CreateNumber(v->acts);
+  cJSON_AddItemToObject(dynamic_datum, "acts", acts_datum);
 
   // alarm status
-  cJSON *alarm_datum = cJSON_CreateNumber(dyn.alarm);
-  cJSON_AddItemToObject(datum, "alarm", alarm_datum);
+  cJSON *alarm_datum = cJSON_CreateNumber(v->alarm);
+  cJSON_AddItemToObject(dynamic_datum, "alarm", alarm_datum);
+
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(datum, "dynamic", dynamic_datum);
+  cJSON_AddItemToObject(datum, "meta", meta_datum);
 
   return 0;
 }
 
-int readMachineToolInfo(cJSON *datum)
-{
-  short ret;
-  static bool toolManagementEnabled = true;
-  static bool useModalToolData = false;
-  if (toolManagementEnabled)
-  {
-    // ODBTLIFE4 toolId2;
-    // short ret = cnc_toolnum(aFlibhndl, 0, 0, &toolId2);
-
-    ODBTLIFE3 toolId;
-    ret = cnc_rdntool(fLibHandle, 0, &toolId);
-    if (ret == EW_OK && toolId.data != 0)
-    {
-      cJSON *id_datum = cJSON_CreateNumber(toolId.data);
-      cJSON_AddItemToObject(datum, "id", id_datum);
-
-      cJSON *group_datum = cJSON_CreateNumber(toolId.datano);
-      cJSON_AddItemToObject(datum, "group", group_datum);
-
-      cJSON *method_datum = cJSON_CreateString("mgmt");
-      cJSON_AddItemToObject(datum, "method", method_datum);
-    }
-    else
-    {
-      fprintf(stderr, "Cannot use cnc_rdntool: %d. Trying modal method\n", ret);
-      toolManagementEnabled = false;
-      useModalToolData = true;
+bool cmpMachineDynamic(MachineDynamic *a, MachineDynamic *b) {
+  if (a->cprogram != b->cprogram || a->mprogram != b->mprogram ||
+      a->sequence != b->sequence || a->actf != b->actf || a->acts != b->acts ||
+      a->alarm != b->alarm || a->dim != b->dim) {
+    return false;
+  }
+  for (int i = 0; i < sizeof(a->dim); i++) {
+    if (a->absolute[i] != b->absolute[i] || a->relative[i] != b->relative[i] ||
+        a->actual[i] != b->actual[i] || a->load[i] != b->load[i]) {
+      return false;
     }
   }
-
-  if (useModalToolData)
-  {
-    ODBMDL command;
-    short ret = cnc_modal(fLibHandle, 108, 1, &command);
-    if (ret == EW_OK)
-    {
-      long toolId = command.modal.aux.aux_data;
-      cJSON *id_datum = cJSON_CreateNumber(toolId);
-      cJSON_AddItemToObject(datum, "id", id_datum);
-
-      cJSON *method_datum = cJSON_CreateString("modal");
-      cJSON_AddItemToObject(datum, "method", method_datum);
-    }
-    else
-    {
-      fprintf(stderr, "cnc_modal failed for T: %d\n", ret);
-      useModalToolData = false;
-    }
-  }
-
-  return 0;
+  return true;
 }
 
-int readMachineProgram(short programNum, cJSON *datum)
-{
-  short ret;
-  // max length of "header", could read entire file
-  char program[2048];
+int checkMachineDynamic(cJSON *updates) {
+  static MachineDynamic *lv = NULL;
+  static cJSON *last = NULL;
 
-  cJSON *number_datum = cJSON_CreateNumber(programNum);
-  cJSON_AddItemToObject(datum, "number", number_datum);
+  MachineDynamic *v;
+  v = malloc(sizeof(MachineDynamic));
 
-  ret = cnc_upstart(fLibHandle, programNum);
-  if (ret == EW_OK)
-  {
-    long len = sizeof(program) - 1; // One for the \0 terminator
-    do
-    {
-      ret = cnc_upload3(fLibHandle, &len, program);
-      if (ret == EW_OK)
-      {
-        program[len] = '\0';
-        int lineCount = 0;
-        // iterate chars until non-comment ("(") character reached.
-        for (char *cp = program; *cp != '\0' && lineCount < 40; ++cp)
-        {
-          if (*cp == '\n')
-          {
-            char f = *(cp + 1);
-            if (lineCount > 0 && f != '(')
-            {
-              *cp = '\0';
-              break;
-            }
-            *cp = ' ';
-            lineCount++;
-          }
-        }
-      }
-    } while (ret == EW_BUFFER);
-  }
-  else if (ret == EW_DATA)
-  {
-    sprintf(program, "(ERR: program %d not found on cnc)", programNum);
-    cJSON *header_datum = cJSON_CreateString(program);
-    cJSON_AddItemToObject(datum, "header", header_datum);
-
-    fprintf(stderr, "failed to initiate program read: %d\n", ret);
-    return 0;
-  }
-  ret = cnc_upend3(fLibHandle);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Failed to close header read!\n");
+  if (getMachineDynamic(v)) {
+    free(v);
+    fprintf(stderr, "failed to read machine dynamic\n");
     return 1;
   }
 
-  cJSON *header_datum = cJSON_CreateString(program);
-  cJSON_AddItemToObject(datum, "header", header_datum);
+  programNum = v->cprogram;
+
+  if (lv == NULL || !cmpMachineDynamic(lv, v)) {
+    if (lv != NULL) {
+      free(lv);
+      cJSON_Delete(last);
+    }
+
+    lv = v;
+    last = cJSON_CreateObject();
+
+    if (serializeMachineDynamic(lv, last)) {
+      fprintf(stderr, "failed to serialize machine dynamic\n");
+      return 1;
+    }
+    cJSON_AddItemReferenceToArray(updates, last);
+  } else {
+    free(v);
+  }
 
   return 0;
 }
 
-void cleanup()
-{
-  printf("cleaning up...\n");
-  short ret = cnc_freelibhndl(fLibHandle);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Failed to free library handle!\n");
-  }
+int serializeMachineToolInfo(MachineToolInfo *v, cJSON *datum) {
+  cJSON *tool_datum = cJSON_CreateObject();
+  cJSON *id_datum = cJSON_CreateNumber(v->id);
+  cJSON_AddItemToObject(tool_datum, "number", id_datum);
+
+  cJSON *group_datum = cJSON_CreateNumber(v->group);
+  cJSON_AddItemToObject(tool_datum, "group", group_datum);
+
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(datum, "meta", meta_datum);
+  cJSON_AddItemToObject(datum, "tool", tool_datum);
+
+  return 0;
 }
 
-void setupEnv()
-{
+int checkMachineToolInfo(cJSON *updates) {
+  static MachineToolInfo *lv = NULL;
+  static cJSON *last = NULL;
+
+  MachineToolInfo *v;
+  v = malloc(sizeof(MachineToolInfo));
+
+  if (getMachineToolInfo(v)) {
+    fprintf(stderr, "failed to read machine tool info\n");
+    return 1;
+  }
+
+  if (lv == NULL || (lv->id != v->id || lv->group != v->group)) {
+    if (lv != NULL) {
+      free(lv);
+      cJSON_Delete(last);
+    }
+
+    lv = v;
+    last = cJSON_CreateObject();
+
+    if (serializeMachineToolInfo(lv, last)) {
+      fprintf(stderr, "failed to read machine tool info\n");
+      return 1;
+    }
+
+    cJSON_AddItemReferenceToArray(updates, last);
+  } else {
+    free(v);
+  }
+  return 0;
+}
+
+int serializeMachineProgram(MachineProgram *v, cJSON *datum) {
+  cJSON *program_datum = cJSON_CreateObject();
+  cJSON *number_datum = cJSON_CreateNumber(v->number);
+  cJSON_AddItemToObject(program_datum, "number", number_datum);
+
+  cJSON *header_datum = cJSON_CreateString(v->header);
+  cJSON_AddItemToObject(program_datum, "header", header_datum);
+
+  cJSON *meta_datum = cJSON_CreateObject();
+  cJSON *t_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta_datum, "t", t_datum);
+
+  cJSON_AddItemToObject(datum, "meta", meta_datum);
+  cJSON_AddItemToObject(datum, "program", program_datum);
+
+  return 0;
+}
+
+int checkMachineProgram(cJSON *updates) {
+  static MachineProgram *lv = NULL;
+  static cJSON *last = NULL;
+  static short lastProgramNum = 0;
+
+  if (lastProgramNum != programNum) {
+    MachineProgram *v;
+    v = malloc(sizeof(MachineProgram));
+
+    if (getMachineProgram(v, programNum)) {
+      free(v);
+      fprintf(stderr, "failed to check machine program: %d\n", programNum);
+      return 1;
+    }
+
+    if (lv != NULL) {
+      free(lv);
+      cJSON_Delete(last);
+    }
+
+    lv = v;
+    last = cJSON_CreateObject();
+
+    if (serializeMachineProgram(v, last)) {
+      fprintf(stderr, "failed to serialize machine program: %d\n", programNum);
+      return 1;
+    }
+
+    cJSON_AddItemReferenceToArray(updates, last);
+    lastProgramNum = programNum;
+  }
+  return 0;
+}
+
+int setupEnv() {
   char *pTmp;
-  if ((pTmp = getenv("DEVICE_IP")) != NULL)
-  {
-    strncpy(mDeviceIP, pTmp, MAXPATH - 1);
-  }
-  else
-  {
-    strcpy(mDeviceIP, "127.0.0.1");
+  if ((pTmp = getenv("DEVICE_IP")) != NULL) {
+    sprintf(deviceIP, "%s", pTmp);
   }
 
-  mDevicePort = 8193;
+  if ((pTmp = getenv("DEVICE_PORT")) != NULL) {
+    char dp[10];
+    char *ptr;
+    strncpy(dp, pTmp, 10);
+    memset(dp, '\0', sizeof(dp));
+    devicePort = strtol(dp, &ptr, 10);
+    if (devicePort <= 0 || devicePort > 65535) {
+      fprintf(stderr, "invalid DEVICE_PORT: %s\n", pTmp);
+      return 1;
+    }
+  }
+
+  if ((pTmp = getenv("MACHINE_NAME")) != NULL) {
+    sprintf(machineName, "%s", pTmp);
+  }
+
+  return 0;
 }
 
-void setupMachineConnection(char *deviceIP, char *devicePort)
-{
-  short ret;
+void intHandler(int sig) { runningCondition = 1; }
 
-  printf("using %s:%d\n", mDeviceIP, mDevicePort);
-
-  // mandatory logging.
-  ret = cnc_startupprocess(0, "focas.log");
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Failed to create log file!\n");
-    return 1;
-  }
-
-  // library handle.  needs to be closed when finished.
-  ret = cnc_allclibhndl3(deviceIP, devicePort, 10 /* timeout (seconds) */, &fLibHandle);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "Failed to connect to cnc!\n");
-    return 1;
-  }
+int loopSetup(cJSON **ptr) {
   atexit(cleanup);
 
-  // set to first path, may be default / not necessary
-  ret = cnc_setpath(fLibHandle, 0);
-  if (ret != EW_OK)
-  {
-    fprintf(stderr, "failed to get set path!\n");
-    exit(EXIT_FAILURE);
+  *ptr = cJSON_CreateArray();
+
+  if (checkMachineInfo(*ptr)) {
+    fprintf(stderr, "failed to read machine info!\n");
     return 1;
   }
+
+  return 0;
 }
 
-void intHandler(int dummy)
-{
-  runningCondition = 1;
+int loopTick(cJSON *updates) {
+  if (checkMachinePartCount(updates) || checkMachineStatus(updates) ||
+      checkMachineToolInfo(updates) || checkMachineDynamic(updates) ||
+      checkMachineMessage(updates) || checkMachineProgram(updates)) {
+    fprintf(stderr, "failed to check machine values\n");
+    return 1;
+  }
+  // jsonDebug("values: ", updates);
+  return 0;
 }
 
-int main(int argc, char **argv)
-{
-  short ret;
+static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage,
+                      void *opaque) {
+  if (rkmessage->err)
+    fprintf(stderr, "%% Message delivery failed: %s\n",
+            rd_kafka_err2str(rkmessage->err));
+  else
+    fprintf(stderr,
+            "%% Message delivered (%zd bytes, "
+            "partition %" PRId32 ")\n",
+            rkmessage->len, rkmessage->partition);
 
-  long programNum = 0;
-  long lastProgramNum = programNum;
-  double divisors[MAX_AXIS];
+  /* The rkmessage is destroyed automatically by librdkafka */
+}
 
+int main(int argc, char **argv) {
   rd_kafka_t *rk;        /* Producer instance handle */
   rd_kafka_conf_t *conf; /* Temporary configuration object */
   char errstr[512];      /* librdkafka API error reporting buffer */
@@ -751,148 +733,125 @@ int main(int argc, char **argv)
   const char *topic;     /* Argument: topic to produce to */
 
   /*
-   * Argument validation
-   */
-  if (argc != 3)
-  {
+  if (argc != 3) {
     fprintf(stderr, "%% Usage: %s <broker> <topic>\n", argv[0]);
     return 1;
   }
+  */
 
-  brokers = argv[1];
-  topic = argv[2];
+  brokers = "localhost:9092";
+  topic = "input";
 
-  /*
-   * Create Kafka client configuration place-holder
-   */
   conf = rd_kafka_conf_new();
 
-  /* Set bootstrap broker(s) as a comma-separated list of
-   * host or host:port (default port 9092).
-   * librdkafka will use the bootstrap brokers to acquire the full
-   * set of brokers from the cluster. */
-  if (rd_kafka_conf_set(conf, "bootstrap.servers", brokers,
-                        errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK)
-  {
+  if (rd_kafka_conf_set(conf, "bootstrap.servers", brokers, errstr,
+                        sizeof(errstr)) != RD_KAFKA_CONF_OK) {
     fprintf(stderr, "%s\n", errstr);
     return 1;
   }
+  rd_kafka_conf_set_dr_msg_cb(conf, dr_msg_cb);
 
-  setupEnv();
-  setupMachineConnection(mDeviceIP, mDevicePort);
+  rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
 
-  signal(SIGINT, intHandler);
-
-  // get values, add to array
-  // loop:
-  //   if changed, add to array
-
-  cJSON *updates = cJSON_CreateArray();
-
-  cJSON *machineInfo = cJSON_CreateObject();
-  if (readMachineInfo(machineInfo, divisors))
-  {
-    fprintf(stderr, "failed to read machine info!\n");
+  if (!rk) {
+    fprintf(stderr, "%% Failed to create new producer: %s\n", errstr);
     exit(EXIT_FAILURE);
     return 1;
   }
-  cJSON_AddItemToArray(updates, machineInfo);
 
-  cJSON *partCountDatum = cJSON_CreateObject();
-  cJSON *machineStatus = cJSON_CreateObject();
-  cJSON *machineToolInfo = cJSON_CreateObject();
-  cJSON *machineDynamic = NULL;
+  if (setupEnv()) {
+    fprintf(stderr, "failed to configure environment variables\n");
+    exit(EXIT_FAILURE);
+    return 1;
+  }
 
-  cJSON *dt;
-  do
-  {
-    dt = cJSON_CreateObject();
-    if (readMachinePartCount(dt))
-    {
-      fprintf(stderr, "failed to read machine part count data!\n");
+  if (setupConnection(deviceIP, devicePort)) {
+    fprintf(stderr, "failed to setup machine connection!\n");
+    return 1;
+  };
+
+  cJSON *updates = NULL;
+
+  signal(SIGINT, intHandler);
+
+  if (loopSetup(&updates)) {
+    fprintf(stderr, "failed to setup loop\n");
+    exit(EXIT_FAILURE);
+    return 1;
+  }
+
+  double tt;
+  struct timespec t0, t1;
+
+  double minimum_interval = 0.5;
+
+  do {
+    rd_kafka_resp_err_t err;
+
+    clock_gettime(CLOCK_REALTIME, &t0);
+
+    if (loopTick(updates)) {
+      fprintf(stderr, "loop check failed\n");
       exit(EXIT_FAILURE);
       return 1;
     }
-    if (!jsonEqual(dt, partCountDatum))
-    {
-      cJSON_Delete(partCountDatum);
-      cJSON_AddItemReferenceToArray(updates, dt);
-      partCountDatum = dt;
-    }
-    else
-    {
-      cJSON_Delete(dt);
+
+    char *serialized = cJSON_PrintUnformatted(updates);
+
+    size_t vlen = strlen(serialized);
+    size_t klen = strlen(deviceID);
+
+    if (vlen == 0) {
+      rd_kafka_poll(rk, 0 /*non-blocking */);
+      continue;
     }
 
-    dt = cJSON_CreateObject();
-    if (readMachineStatus(dt))
-    {
-      fprintf(stderr, "failed to read machine status!\n");
-      exit(EXIT_FAILURE);
-      return 1;
-    }
-    if (!jsonEqual(dt, machineStatus))
-    {
-      cJSON_Delete(machineStatus);
-      cJSON_AddItemReferenceToArray(updates, dt);
-      machineStatus = dt;
-    }
-    else
-    {
-      cJSON_Delete(dt);
-    }
+    err = rd_kafka_producev(
+        rk,
+        RD_KAFKA_V_TOPIC(topic),
+        RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+        RD_KAFKA_V_VALUE(serialized, vlen),
+        RD_KAFKA_V_KEY(deviceID, klen),
+        RD_KAFKA_V_OPAQUE(NULL),
+        RD_KAFKA_V_END);
 
-    dt = cJSON_CreateObject();
-    if (readMachineToolInfo(dt))
-    {
-      fprintf(stderr, "failed to get tool info!\n");
-      exit(EXIT_FAILURE);
-      return 1;
-    }
-    if (!jsonEqual(dt, machineToolInfo))
-    {
-      cJSON_Delete(machineToolInfo);
-      cJSON_AddItemReferenceToArray(updates, dt);
-      machineToolInfo = dt;
-    }
-    else
-    {
-      cJSON_Delete(dt);
-    }
+    if (err) {
+      fprintf(stderr, "%% Failed to produce to topic %s: %s\n", topic,
+              rd_kafka_err2str(err));
 
-    machineDynamic = cJSON_CreateObject();
-    if (readMachineDynamic(machineDynamic, divisors, &programNum))
-    {
-      fprintf(stderr, "failed to read dynamic info!\n");
-      exit(EXIT_FAILURE);
-      return 1;
-    }
-    cJSON_AddItemToArray(updates, machineDynamic);
-
-    if (programNum != lastProgramNum)
-    {
-      cJSON *machineProgram = cJSON_CreateObject();
-      if (readMachineProgram(programNum, machineProgram))
-      {
-        fprintf(stderr, "failed to read program header!\n");
-        exit(EXIT_FAILURE);
-        return 1;
+      if (err == RD_KAFKA_RESP_ERR__QUEUE_FULL) {
+        fprintf(stderr, "error: queue full\n");
       }
-      lastProgramNum = programNum;
-      cJSON_AddItemToArray(updates, machineProgram);
     }
 
-    char *string = cJSON_PrintUnformatted(updates);
-    if (string == NULL)
-    {
-      fprintf(stderr, "Failed to print monitor.\n");
-    }
-    printf("%s\n\n", string);
+    rd_kafka_poll(rk, 0 /*non-blocking*/);
 
+    clock_gettime(CLOCK_REALTIME, &t1);
+    tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+
+    if (tt < minimum_interval) {
+      usleep((long)((minimum_interval - tt) * 1e6));
+    }
+
+    free(serialized);
     cJSON_Delete(updates);
     updates = cJSON_CreateArray();
 
+    // sleep(mScanDelay);
   } while (!runningCondition);
 
-  // sleep(mScanDelay);
+  fprintf(stderr, "%% Flushing final messages..\n");
+  rd_kafka_flush(rk, 10 * 1000 /* wait for max 10 seconds */);
+
+  /* If the output queue is still not empty there is an issue
+   * with producing messages to the clusters. */
+  if (rd_kafka_outq_len(rk) > 0)
+    fprintf(stderr, "%% %d message(s) were not delivered\n",
+            rd_kafka_outq_len(rk));
+
+  /* Destroy the producer instance */
+  rd_kafka_destroy(rk);
+
+  cJSON_Delete(updates);
+  exit(EXIT_SUCCESS);
 }
