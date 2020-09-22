@@ -10,7 +10,7 @@ services:
     restart: always
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_LOG_DIRS: /kafka/logs-1
+#      KAFKA_LOG_DIRS: /kafka/logs-1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_CREATE_TOPICS: "input:1:1,values:6:1,state:6:1"
       KAFKA_LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092
@@ -25,6 +25,7 @@ services:
   driver:
     image: strangesast/fanuc_driver
     network_mode: host
+    restart: unless-stopped
     build:
       context: .
 volumes:

@@ -9,7 +9,7 @@ add_library(cjson STATIC external/cJSON/cJSON.c)
 
 add_executable(fanuc_driver main.c data.c)
 set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-pthread")
-target_link_libraries(fanuc_driver m fwlib32 cjson pthread)
+target_link_libraries(fanuc_driver rt m fwlib32 cjson pthread)
 
 set(RDKAFKA_BUILD_STATIC ON CACHE BOOL "")
 add_subdirectory(external/librdkafka)

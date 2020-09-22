@@ -356,10 +356,11 @@ int getMachineProgram(MachineProgram *v, short programNum) {
         program[len] = '\0';
         int lineCount = 0;
         // iterate chars until non-comment ("(") character reached.
-        for (char *cp = program; *cp != '\0' && lineCount < 40; ++cp) {
+        for (char *cp = program; *cp != '\0'; ++cp) {
           if (*cp == '\n') {
             char f = *(cp + 1);
-            if (lineCount > 0 && f != '(') {
+            // allow for empty lines, comments, macros
+            if (lineCount > 0 && f != '(' && f != '\n' && f != ' ' && f != '#') {
               *cp = '\0';
               break;
             }

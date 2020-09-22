@@ -21,4 +21,4 @@ run mkdir build && \
   make && \
   make install
 
-cmd ["./build/fanuc_driver"]
+cmd ["fanuc_driver"]
