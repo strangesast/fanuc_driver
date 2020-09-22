@@ -5,6 +5,9 @@ services:
     restart: always
     ports:
       - "2181:2181"
+    volumes:
+      - zookeeper_data:/opt/zookeeper-3.4.13/data
+      - zookeeper_log:/opt/zookeeper-3.4.13/conf
   kafka:
     image: wurstmeister/kafka
     restart: always
@@ -23,10 +26,12 @@ services:
     volumes:
       - kafka_data:/kafka/logs-1
   driver:
-    image: strangesast/fanuc_driver
+    image: strangesast/fanuc-driver
     network_mode: host
     restart: unless-stopped
     build:
       context: .
 volumes:
   kafka_data:
+  zookeeper_log:
+  zookeeper_data:

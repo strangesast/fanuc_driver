@@ -23,23 +23,9 @@ char machineName[128];
 short programNum = 0;
 long partCount = -1;
 int devicePort = 8193;
+const double minimum_interval = 0.5;
 
 static volatile int runningCondition = 0;
-
-bool jsonEqual(cJSON *a, cJSON *b) {
-  char *aa = cJSON_PrintUnformatted(a);
-  char *bb = cJSON_PrintUnformatted(b);
-  bool eql = strcmp(aa, bb) == 0;
-  free(aa);
-  free(bb);
-  return eql;
-}
-
-void jsonDebug(char *ref, cJSON *o) {
-  char *string = cJSON_Print(o);
-  printf("%s%s\n", ref, string);
-  free(string);
-}
 
 int checkMachineInfo(cJSON *updates, cJSON *meta) {
   static MachineInfo *lv = NULL;
@@ -54,7 +40,6 @@ int checkMachineInfo(cJSON *updates, cJSON *meta) {
     return 1;
   }
 
-  // if changed or first call
   if (lv == NULL || lv->id != v->id) {
     cJSON *id_datum = cJSON_CreateString(v->id);
     cJSON_AddItemToObject(updates, "id", id_datum);
@@ -411,7 +396,6 @@ int checkMachineDynamic(cJSON *updates, cJSON *meta) {
 
 int checkMachineToolInfo(cJSON *updates, cJSON *meta) {
   static MachineToolInfo *lv = NULL;
-  static cJSON *last = NULL;
 
   MachineToolInfo *v;
   v = malloc(sizeof(MachineToolInfo));
@@ -501,7 +485,7 @@ int setupEnv() {
 
 void intHandler(int sig) { runningCondition = 1; }
 
-int loopSetup(cJSON **updatesPtr, cJSON **metaPtr) {
+int loop_setup(cJSON **updatesPtr, cJSON **metaPtr) {
   atexit(cleanup);
 
   *updatesPtr = cJSON_CreateObject();
@@ -515,7 +499,7 @@ int loopSetup(cJSON **updatesPtr, cJSON **metaPtr) {
   return 0;
 }
 
-int loopTick(cJSON *updates, cJSON *meta) {
+int loop_tick(cJSON *updates, cJSON *meta) {
   if (checkMachinePartCount(updates, meta) ||
       checkMachineStatus(updates, meta) ||
       checkMachineToolInfo(updates, meta) ||
@@ -525,22 +509,19 @@ int loopTick(cJSON *updates, cJSON *meta) {
     fprintf(stderr, "failed to check machine values\n");
     return 1;
   }
-  // jsonDebug("values: ", updates);
   return 0;
 }
 
 static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage,
                       void *opaque) {
-  if (rkmessage->err)
+  if (rkmessage->err) {
     fprintf(stderr, "%% Message delivery failed: %s\n",
             rd_kafka_err2str(rkmessage->err));
-  else
-    fprintf(stderr,
-            "%% Message delivered (%zd bytes, "
-            "partition %" PRId32 ")\n",
-            rkmessage->len, rkmessage->partition);
-
-  /* The rkmessage is destroyed automatically by librdkafka */
+  }
+  // fprintf(stderr,
+  //        "%% Message delivered (%zd bytes, "
+  //        "partition %" PRId32 ")\n",
+  //        rkmessage->len, rkmessage->partition);
 }
 
 int main(int argc, char **argv) {
@@ -549,13 +530,6 @@ int main(int argc, char **argv) {
   char errstr[512];      /* librdkafka API error reporting buffer */
   const char *brokers;   /* Argument: broker list */
   const char *topic;     /* Argument: topic to produce to */
-
-  /*
-  if (argc != 3) {
-    fprintf(stderr, "%% Usage: %s <broker> <topic>\n", argv[0]);
-    return 1;
-  }
-  */
 
   brokers = "localhost:9092";
   topic = "input";
@@ -585,6 +559,7 @@ int main(int argc, char **argv) {
 
   if (setupConnection(deviceIP, devicePort)) {
     fprintf(stderr, "failed to setup machine connection!\n");
+    exit(EXIT_FAILURE);
     return 1;
   };
 
@@ -594,7 +569,7 @@ int main(int argc, char **argv) {
   signal(SIGINT, intHandler);
   signal(SIGTERM, intHandler);
 
-  if (loopSetup(&updates, &meta)) {
+  if (loop_setup(&updates, &meta)) {
     fprintf(stderr, "failed to setup loop\n");
     exit(EXIT_FAILURE);
     return 1;
@@ -603,19 +578,19 @@ int main(int argc, char **argv) {
   double tt;
   struct timespec t0, t1;
 
-  double minimum_interval = 0.5;
-
   do {
     rd_kafka_resp_err_t err;
 
     clock_gettime(CLOCK_REALTIME, &t0);
 
-    if (loopTick(updates, meta)) {
+    if (loop_tick(updates, meta)) {
       fprintf(stderr, "loop check failed\n");
       exit(EXIT_FAILURE);
       return 1;
     }
+
     clock_gettime(CLOCK_REALTIME, &t1);
+
     tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
     cJSON *total_meta_datum = cJSON_CreateNumber(tt);
     cJSON_AddItemToObject(meta, "total", total_meta_datum);
@@ -657,22 +632,20 @@ int main(int argc, char **argv) {
     cJSON_Delete(obj);
     updates = cJSON_CreateObject();
     meta = cJSON_CreateObject();
-
-    // sleep(mScanDelay);
   } while (!runningCondition);
+
+  cJSON_Delete(updates);
 
   fprintf(stderr, "%% Flushing final messages..\n");
   rd_kafka_flush(rk, 10 * 1000 /* wait for max 10 seconds */);
 
   /* If the output queue is still not empty there is an issue
    * with producing messages to the clusters. */
-  if (rd_kafka_outq_len(rk) > 0)
+  if (rd_kafka_outq_len(rk) > 0) {
     fprintf(stderr, "%% %d message(s) were not delivered\n",
             rd_kafka_outq_len(rk));
+  }
 
-  /* Destroy the producer instance */
   rd_kafka_destroy(rk);
-
-  cJSON_Delete(updates);
   exit(EXIT_SUCCESS);
 }

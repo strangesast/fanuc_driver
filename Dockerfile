@@ -1,17 +1,16 @@
-from i386/debian
+from debian:buster-slim as base
+arg TARGETPLATFORM
+arg BUILDPLATFORM
 
+copy setup.sh external/fwlib/*.so.1.0.5 /tmp/
+run /tmp/setup.sh && ldconfig /lib
+
+from base as builder
 run apt-get update && apt-get install -y \
   build-essential \
   cmake
 
 workdir /usr/src/app
-
-#run mkdir /fwlib
-#copy external/fwlib/*.so.1.0.5 ./fwlib/
-#env LD_LIBRARY_PATH="/fwlib:${LD_LIBRARY_PATH}"
-#run ldconfig
-copy external/fwlib/libfwlib32-linux-x86.so.1.0.5 /usr/local/lib/
-run ln -s /usr/local/lib/libfwlib32-linux-x86.so.1.0.5 /usr/local/lib/libfwlib32.so && ldconfig
 
 copy . .
 
@@ -21,4 +20,6 @@ run mkdir build && \
   make && \
   make install
 
+from base
+copy --from=builder /usr/src/app/build/fanuc_driver /usr/local/bin
 cmd ["fanuc_driver"]
