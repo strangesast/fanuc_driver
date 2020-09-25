@@ -1,0 +1,3 @@
+[submodule "external/fanuc"]
+	path = external/fanuc
+	url = https://github.com/strangesast/fanuc-python-extension.git
