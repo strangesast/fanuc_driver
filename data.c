@@ -23,7 +23,6 @@ double divisors[MAX_AXIS];
 
 // get machine properties (unique id, characteristics, software versions)
 int getMachineInfo(MachineInfo *v) {
-  short ret;
   short etherType;
   short etherDevice;
   short pathNumber = 0;
@@ -63,13 +62,12 @@ int getMachineInfo(MachineInfo *v) {
   v->etherType = etherType;
   v->etherDevice = etherDevice;
 
-  ret = cnc_rdaxisdata(libh, 1 /* Position Value */, (short *)types, num, &len,
-                       axisData);
+  bool hasAxisData =
+      cnc_rdaxisdata(libh, 1 /* Position Value */, (short *)types, num, &len,
+                     axisData) == EW_OK;
 
-  bool hasAxisData = ret == EW_OK;
   if (!hasAxisData) {
-    fprintf(stderr, "cnc_rdaxisdata returned %d for path %d\n", ret,
-            pathNumber);
+    fprintf(stderr, "cnc_rdaxisdata failed.");
   }
 
   if (cnc_getfigure(libh, 0, &count, inprec, outprec) != EW_OK ||
@@ -78,26 +76,24 @@ int getMachineInfo(MachineInfo *v) {
     return 1;
   }
 
-  if (ret == EW_OK) {
-    v->axes_count = axisCount;
-    for (int i = 0; i < axisCount; i++) {
-      double divisor = pow((long double)10.0, (long double)inprec[i]);
-      divisors[i] = divisor;
+  v->axes_count = axisCount;
+  for (int i = 0; i < axisCount; i++) {
+    double divisor = pow((long double)10.0, (long double)inprec[i]);
+    divisors[i] = divisor;
 
-      sprintf(v->axes[i].id, "%c", axes[i].name);
-      v->axes[i].index = i;
-      sprintf(v->axes[i].suffix, "%c", axes[i].suff);
-      v->axes[i].divisor = divisor;
+    sprintf(v->axes[i].id, "%c", axes[i].name);
+    v->axes[i].index = i;
+    sprintf(v->axes[i].suffix, "%c", axes[i].suff);
+    v->axes[i].divisor = divisor;
 
-      if (hasAxisData) {
-        sprintf(v->axes[i].name, "%s", axisData[i].name);
-        v->axes[i].flag = axisData[i].flag;
-        short unit = axisData[i].unit;
-        v->axes[i].unit = unit;
-        char *unith = AXIS_UNITH[unit];
-        strncpy(v->axes[i].unith, unith, 20);
-        v->axes[i].decimal = axisData[i].dec;
-      }
+    if (hasAxisData) {
+      sprintf(v->axes[i].name, "%s", axisData[i].name);
+      v->axes[i].flag = axisData[i].flag;
+      short unit = axisData[i].unit;
+      v->axes[i].unit = unit;
+      char *unith = AXIS_UNITH[unit];
+      strncpy(v->axes[i].unith, unith, 20);
+      v->axes[i].decimal = axisData[i].dec;
     }
   }
 

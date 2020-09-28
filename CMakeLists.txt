@@ -11,7 +11,10 @@ add_library(FWLIB SHARED IMPORTED external/fwlib/fwlib32.h)
 add_library(cjson STATIC external/cJSON/cJSON.c)
 
 add_executable(fanuc_driver main.c data.c)
+
 set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-pthread")
+#set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-m32 -pthread" LINK_FLAGS "-m32")
+
 target_link_libraries(fanuc_driver rt m fwlib32 cjson pthread)
 
 set(RDKAFKA_BUILD_STATIC ON CACHE BOOL "")

@@ -8,7 +8,8 @@ run /tmp/setup.sh && ldconfig /lib
 from base as builder
 run apt-get update && apt-get install -y \
   build-essential \
-  cmake
+  cmake \
+  g++-multilib
 
 workdir /usr/src/app
 
