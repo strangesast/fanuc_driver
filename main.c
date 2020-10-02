@@ -539,6 +539,7 @@ int main(int argc, char **argv) {
   if (rd_kafka_conf_set(conf, "bootstrap.servers", brokers, errstr,
                         sizeof(errstr)) != RD_KAFKA_CONF_OK) {
     fprintf(stderr, "%s\n", errstr);
+    exit(EXIT_FAILURE);
     return 1;
   }
   rd_kafka_conf_set_dr_msg_cb(conf, dr_msg_cb);

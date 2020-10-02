@@ -12,8 +12,14 @@ add_library(cjson STATIC external/cJSON/cJSON.c)
 
 add_executable(fanuc_driver main.c data.c)
 
-set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-pthread")
-#set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-m32 -pthread" LINK_FLAGS "-m32")
+if( "$ENV{ARCH}" STREQUAL "x64" )
+  target_compile_options(fanuc_driver PRIVATE -pthread -m32)
+  set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
+else()
+  target_compile_options(fanuc_driver PRIVATE -pthread)
+  set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-pthread")
+endif()
+
 
 target_link_libraries(fanuc_driver rt m fwlib32 cjson pthread)
 

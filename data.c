@@ -25,7 +25,6 @@ double divisors[MAX_AXIS];
 int getMachineInfo(MachineInfo *v) {
   short etherType;
   short etherDevice;
-  short pathNumber = 0;
   short len = MAX_AXIS;
   short count;
   short types[] = {1 /* actual position */};
@@ -50,7 +49,7 @@ int getMachineInfo(MachineInfo *v) {
   }
 
   // machine id
-  sprintf(v->id, "%08x-%08x-%08x-%08x", cncIDs[0], cncIDs[1], cncIDs[2],
+  sprintf(v->id, "%08lx-%08lx-%08lx-%08lx", cncIDs[0], cncIDs[1], cncIDs[2],
           cncIDs[3]);
   v->max_axis = sysinfo.max_axis;
   v->addinfo = sysinfo.addinfo;
