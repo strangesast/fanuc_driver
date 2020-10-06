@@ -1,0 +1,61 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "MachineDynamic",
+  "fields": [
+    {
+      "name": "alarm",
+      "type": "long"
+    },
+    {
+      "name": "cprogram",
+      "type": "long"
+    },
+    {
+      "name": "mprogram",
+      "type": "long"
+    },
+    {
+      "name": "sequence",
+      "type": "long"
+    },
+    {
+      "name": "actf",
+      "type": "long"
+    },
+    {
+      "name": "acts",
+      "type": "long"
+    },
+    {
+      "name": "axis",
+      "type": {
+        "type": "array",
+        "items": {
+          "namespace": "strangesast",
+          "type": "record",
+          "name": "MachineDynamicAxis",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            },
+            {
+              "name": "absolute",
+              "type": "double"
+            },
+            {
+              "name": "actual",
+              "type": "double"
+            },
+            {
+              "name": "load",
+              "type": "double"
+            }
+          ]
+        },
+        "default": []
+      }
+    }
+  ]
+}

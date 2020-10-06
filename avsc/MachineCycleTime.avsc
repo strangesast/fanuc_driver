@@ -1,0 +1,19 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "MachineCycleTime",
+  "fields": [
+    {
+      "name": "count",
+      "type": "long"
+    },
+    {
+      "name": "minutes",
+      "type": "long"
+    },
+    {
+      "name": "milliseconds",
+      "type": "long"
+    }
+  ]
+}

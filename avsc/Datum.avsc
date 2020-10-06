@@ -1,0 +1,30 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "Datum",
+  "fields": [
+    {
+      "name": "timestamp",
+      "type": "long"
+    },
+    {
+      "name": "machine_id",
+      "type": "string"
+    },
+    {
+      "name": "data",
+      "type": {
+        "type": "array",
+        "items": [
+          "MachineDetail",
+          "MachineDynamic",
+          "MachinePartCount",
+          "MachineProgram",
+          "MachineStatus",
+          "MachineToolInfo"
+        ],
+        "default": []
+      }
+    }
+  ]
+}

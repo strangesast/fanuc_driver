@@ -1,0 +1,15 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "MachineToolInfo",
+  "fields": [
+    {
+      "name": "id",
+      "type": "long"
+    },
+    {
+      "name": "group",
+      "type": "long"
+    }
+  ]
+}

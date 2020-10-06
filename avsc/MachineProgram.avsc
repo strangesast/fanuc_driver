@@ -1,0 +1,15 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "MachineProgram",
+  "fields": [
+    {
+      "name": "number",
+      "type": "int"
+    },
+    {
+      "name": "header",
+      "type": "string"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "MachineAxisDetail",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string"
+    },
+    {
+      "name": "index",
+      "type": "int"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "suffix",
+      "type": "string"
+    },
+    {
+      "name": "unit",
+      "type": "int"
+    },
+    {
+      "name": "unith",
+      "type": "string"
+    },
+    {
+      "name": "divisor",
+      "type": "double"
+    },
+    {
+      "name": "decimal",
+      "type": "int"
+    },
+    {
+      "name": "flag",
+      "type": "int"
+    }
+  ]
+}

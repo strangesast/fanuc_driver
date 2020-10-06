@@ -1,0 +1,63 @@
+{
+  "namespace": "strangesast",
+  "type": "record",
+  "name": "MachineStatus",
+  "fields": [
+    {
+      "name": "execution",
+      "type": {
+        "type": "enum",
+        "name": "Execution",
+        "symbols" : ["ACTIVE", "INTERRUPTED", "STOPPED", "READY"]
+      }
+    },
+    {
+      "name": "mode",
+      "type": {
+        "type": "enum",
+        "name": "Mode",
+        "symbols" : ["MANUAL", "MANUAL_DATA_INPUT", "AUTOMATIC"]
+      }
+    },
+    {
+      "name": "estop",
+      "type": {
+        "type": "enum",
+        "name": "EStop",
+        "symbols" : ["TRIGGERED", "ARMED"]
+      }
+    },
+    {
+      "name": "auto",
+      "type": "int"
+    },
+    {
+      "name": "manual",
+      "type": "int"
+    },
+    {
+      "name": "run",
+      "type": "int"
+    },
+    {
+      "name": "edit",
+      "type": "int"
+    },
+    {
+      "name": "motion",
+      "type": "int"
+    },
+    {
+      "name": "mstb",
+      "type": "int"
+    },
+    {
+      "name": "emergency",
+      "type": "int"
+    },
+    {
+      "name": "alarm",
+      "type": "int"
+    }
+  ]
+}
