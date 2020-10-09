@@ -7,10 +7,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "../external/cJSON/cJSON.h"
+#include "../external/fwlib/fwlib32.h"
+#include "../external/librdkafka/src/rdkafka.h"
 #include "./data.h"
-#include "./external/cJSON/cJSON.h"
-#include "./external/fwlib/fwlib32.h"
-#include "./external/librdkafka/src/rdkafka.h"
 
 #define MAXPATH 1024
 #define BILLION 1000000000.0

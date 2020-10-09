@@ -6,7 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include "./external/fwlib/fwlib32.h"
+#include "../external/fwlib/fwlib32.h"
 #define PART_COUNT_PARAMETER 6711
 #define BILLION 1000000000.0
 
