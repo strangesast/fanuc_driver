@@ -1,0 +1,86 @@
+version: '3.7'
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/opt/zookeeper-3.4.13/data
+      - zookeeper_log:/opt/zookeeper-3.4.13/conf
+  kafka:
+    image: wurstmeister/kafka
+    restart: always
+    environment:
+      KAFKA_BROKER_ID: 1
+#      KAFKA_LOG_DIRS: /kafka/logs-1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "input:1:1,values:6:1,state:6:1"
+      KAFKA_LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/kafka/logs-1
+  driver0:
+    image: strangesast/fanuc_driver
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - DEVICE_IP=10.0.0.200
+    build:
+      context: .
+      dockerfile: Dockerfile
+  driver1:
+    image: strangesast/fanuc_driver
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - DEVICE_IP=10.0.0.207
+    build:
+      context: .
+      dockerfile: Dockerfile
+  driver2:
+    image: strangesast/fanuc_driver
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - DEVICE_IP=10.0.0.208
+    build:
+      context: .
+      dockerfile: Dockerfile
+  driver3:
+    image: strangesast/fanuc_driver
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - DEVICE_IP=10.0.0.209
+    build:
+      context: .
+      dockerfile: Dockerfile
+  driver4:
+    image: strangesast/fanuc_driver
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - DEVICE_IP=10.0.0.206
+    build:
+      context: .
+      dockerfile: Dockerfile
+  driver5:
+    image: strangesast/fanuc_driver
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - DEVICE_IP=10.0.0.112
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+volumes:
+  kafka_data:
+  zookeeper_log:
+  zookeeper_data:
