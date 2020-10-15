@@ -34,9 +34,13 @@ def check_value_key_distribution():
     
         values, meta = v['values'], v['meta']
     
-        for key in values:
-            total += 1
-            d[key] += 1
+        keys = values.keys()
+        if len(keys):
+            for key in keys:
+                total += 1
+                d[key] += 1
+        else:
+            d[None] += 1
     
         if (i & (i - 1)) == 0:
             print(i, total)
@@ -92,6 +96,15 @@ def check():
             break
     
         d[msg.key] = msg.timestamp
+
+
+def check_key():
+    for i, msg in enumerate(consumer):
+        v = json.loads(msg.value)
+        values, meta = v['values'], v['meta']
+    
+        if (value := values.get('block')):
+            print('value', value)
 
 #check_pkey_distribution()
 #check_value_key_distribution()

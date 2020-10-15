@@ -550,7 +550,8 @@ int loop_tick(cJSON *updates, cJSON *meta) {
       checkMachineToolInfo(updates, meta) ||
       checkMachineDynamic(updates, meta) ||
       checkMachineMessage(updates, meta) ||
-      checkMachineProgram(updates, meta)) {
+      checkMachineProgram(updates, meta) ||
+      checkMachineBlock(updates, meta)) {
     fprintf(stderr, "failed to check machine values\n");
     return 1;
   }
