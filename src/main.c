@@ -591,13 +591,14 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  double tt;
   struct timespec t0, t1;
+  unsigned long tt;
 
   do {
     rd_kafka_resp_err_t err;
 
-    clock_gettime(CLOCK_REALTIME, &t0);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
     if (loop_tick(updates, meta)) {
       fprintf(stderr, "loop check failed\n");
@@ -605,9 +606,9 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    clock_gettime(CLOCK_REALTIME, &t1);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+    tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
 
-    tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
     cJSON *total_meta_datum = cJSON_CreateNumber(tt);
     cJSON_AddItemToObject(meta, "total", total_meta_datum);
 

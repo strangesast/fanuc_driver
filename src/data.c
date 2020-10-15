@@ -42,9 +42,9 @@ int getMachineInfo(MachineInfo *v) {
   ODBAXISNAME axes[MAX_AXIS];
 
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   if (cnc_sysinfo(libh, &sysinfo) != EW_OK ||
       cnc_rdcncid(libh, cncIDs) != EW_OK ||
@@ -101,8 +101,8 @@ int getMachineInfo(MachineInfo *v) {
     }
   }
 
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
 
   return 0;
@@ -110,17 +110,17 @@ int getMachineInfo(MachineInfo *v) {
 
 int getMachineMessage(MachineMessage *v) {
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
   OPMSG message;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
   if (cnc_rdopmsg(libh, 0, 6 + 256, &message) != EW_OK) {
     fprintf(stderr, "Failed to read operator message.\n");
     return 1;
   }
 
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
   v->number = message.datano;
   sprintf(v->text, "%s", message.data);
@@ -129,10 +129,10 @@ int getMachineMessage(MachineMessage *v) {
 
 int getMachineStatus(MachineStatus *v) {
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
   ODBST status;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   if (cnc_statinfo(libh, &status) != EW_OK) {
     fprintf(stderr, "Cannot get cnc_statinfo.\n");
@@ -152,8 +152,8 @@ int getMachineStatus(MachineStatus *v) {
   ALMINFO alarminfo;
   ret = cnc_rdalminfo(mFlibHndl, 1, short alm_type, short length, &alarminfo)
   */
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
 
   short aut = status.aut;
@@ -186,18 +186,18 @@ int getMachineStatus(MachineStatus *v) {
 
 int getMachinePartCount(MachinePartCount *v) {
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
   IODBPSD param;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   if (cnc_rdparam(libh, PART_COUNT_PARAMETER, ALL_AXES, 8, &param) != EW_OK) {
     fprintf(stderr, "Failed to read part parameter!\n");
     return 1;
   }
 
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
   v->count = param.u.ldata;
   return 0;
@@ -206,20 +206,20 @@ int getMachinePartCount(MachinePartCount *v) {
 int getMachineCycleTime(MachineCycleTime *v) {
   short timeType = 3;  // 0->Power on time, 1->Operating time, 2->Cutting
                        // time, 3->Cycle time, 4->Free purpose,
-  double tt;
+  unsigned long tt;
   struct timespec t0, t1;
   IODBTIME time;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   if (cnc_rdtimer(libh, timeType, &time) != EW_OK) {
     fprintf(stderr, "Failed to get time for type %d!\n", timeType);
     return 1;
   }
 
-  clock_gettime(CLOCK_REALTIME, &t1);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
 
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
 
   v->time = time.minute * 60 * 1000 + time.msec;
@@ -231,11 +231,11 @@ int getMachineCycleTime(MachineCycleTime *v) {
 int getMachineDynamic(MachineDynamic *v) {
   short num = MAX_AXIS;
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
   ODBDY2 dyn;
   ODBSVLOAD axLoad[num];
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   if (cnc_rddynamic2(libh, ALL_AXES, sizeof(dyn), &dyn) != EW_OK ||
       cnc_rdsvmeter(libh, &num, axLoad) != EW_OK) {
@@ -243,8 +243,8 @@ int getMachineDynamic(MachineDynamic *v) {
     return 1;
   }
 
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
 
   for (int i = 0; i < num; i++) {
@@ -269,9 +269,9 @@ int getMachineToolInfo(MachineToolInfo *v) {
   static bool toolManagementEnabled = true;
   static bool useModalToolData = false;
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   if (toolManagementEnabled) {
     // ODBTLIFE4 toolId2;
@@ -299,8 +299,8 @@ int getMachineToolInfo(MachineToolInfo *v) {
       useModalToolData = false;
     }
   }
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
 
   return 0;
@@ -311,9 +311,9 @@ int getMachineProgram(MachineProgram *v, short programNum) {
   // max length of "header", could read entire file
   char program[2048];
   struct timespec t0, t1;
-  double tt;
+  unsigned long tt;
 
-  clock_gettime(CLOCK_REALTIME, &t0);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
   ret = cnc_upstart(libh, programNum);
   if (ret == EW_OK || ret == EW_BUSY) {
@@ -352,8 +352,9 @@ int getMachineProgram(MachineProgram *v, short programNum) {
     fprintf(stderr, "Failed to close header read!\n");
     return 1;
   }
-  clock_gettime(CLOCK_REALTIME, &t1);
-  tt = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / BILLION;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
 
   v->number = programNum;

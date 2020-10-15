@@ -13,7 +13,7 @@ typedef struct MachineAxisInfo {
 } MachineAxisInfo;
 
 typedef struct MachineInfo {
-  double executionDuration;
+  unsigned long executionDuration;
   char id[36];
   short max_axis;
   short addinfo;
@@ -29,7 +29,7 @@ typedef struct MachineInfo {
 } MachineInfo;
 
 typedef struct MachineMessage {
-  double executionDuration;
+  unsigned long executionDuration;
   short number;
   char text[256];
 } MachineMessage;
@@ -46,7 +46,7 @@ typedef struct MachineRawStatus {
 } MachineRawStatus;
 
 typedef struct MachineStatus {
-  double executionDuration;
+  unsigned long executionDuration;
   char execution[20];
   char mode[20];
   char estop[20];
@@ -54,7 +54,7 @@ typedef struct MachineStatus {
 } MachineStatus;
 
 typedef struct MachinePartCount {
-  double executionDuration;
+  unsigned long executionDuration;
   long count;
 } MachinePartCount;
 
@@ -64,13 +64,13 @@ typedef struct MachineRawCycleTime {
 } MachineRawCycleTime;
 
 typedef struct MachineCycleTime {
-  double executionDuration;
+  unsigned long executionDuration;
   long time;  // milliseconds
   MachineRawCycleTime raw;
 } MachineCycleTime;
 
 typedef struct MachineDynamic {
-  double executionDuration;
+  unsigned long executionDuration;
   short cprogram;
   short mprogram;
   short sequence;
@@ -85,13 +85,13 @@ typedef struct MachineDynamic {
 } MachineDynamic;
 
 typedef struct MachineToolInfo {
-  double executionDuration;
+  unsigned long executionDuration;
   long id;
   long group;
 } MachineToolInfo;
 
 typedef struct MachineProgram {
-  double executionDuration;
+  unsigned long executionDuration;
   short number;
   char header[2048];
 } MachineProgram;
