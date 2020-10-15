@@ -1,15 +1,11 @@
-from debian:buster-slim as base
-arg TARGETPLATFORM
-arg BUILDPLATFORM
+from strangesast/fwlib as base
 
-copy setup.sh external/fwlib/*.so.1.0.5 /tmp/
-run /tmp/setup.sh && ldconfig /lib
+run apt-get update && apt-get install -y librdkafka-dev:i386
 
 from base as builder
-run apt-get update && apt-get install -y \
-  build-essential \
-  cmake \
-  g++-multilib
+
+copy ./external/fwlib/build-deps.sh /tmp/
+run /tmp/build-deps.sh
 
 workdir /usr/src/app
 
@@ -22,5 +18,6 @@ run mkdir build && \
   make install
 
 from base
+
 copy --from=builder /usr/src/app/build/fanuc_driver /usr/local/bin
 cmd ["fanuc_driver"]

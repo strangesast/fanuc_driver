@@ -1,4 +1,8 @@
+#define _GNU_SOURCE
+#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #include "./data.h"
+
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -6,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
 #include "../external/fwlib/fwlib32.h"
 #define PART_COUNT_PARAMETER 6711
 #define BILLION 1000000000.0

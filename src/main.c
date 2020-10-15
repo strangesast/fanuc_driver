@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #include <math.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -12,18 +15,21 @@
 #include "../external/librdkafka/src/rdkafka.h"
 #include "./data.h"
 
+#define MAXLEN 128
 #define MAXPATH 1024
 #define BILLION 1000000000.0
 
 short unsigned int fLibHandle;
 
 char deviceIP[MAXPATH] = "127.0.0.1";
-char deviceID[128];
-char machineName[128];
+char deviceID[MAXLEN];
+char machineName[MAXLEN];
 short programNum = 0;
 long partCount = -1;
 int devicePort = 8193;
 const double minimum_interval = 0.5;
+char *brokers = "localhost:9092"; /* Argument: broker list */
+char *topic = "input";            /* Argument: topic to produce to */
 
 static volatile int runningCondition = 0;
 
@@ -43,7 +49,8 @@ int checkMachineInfo(cJSON *updates, cJSON *meta) {
   if (lv == NULL || lv->id != v->id) {
     cJSON *id_datum = cJSON_CreateString(v->id);
     cJSON_AddItemToObject(updates, "id", id_datum);
-    strncpy(deviceID, v->id, 128);
+    memset(deviceID, 0, MAXLEN);
+    strncpy(deviceID, v->id, MAXLEN - 1);
   }
   if (lv == NULL || lv->max_axis != v->max_axis) {
     cJSON *max_axis_datum = cJSON_CreateNumber(v->max_axis);
@@ -467,8 +474,8 @@ int setupEnv() {
   if ((pTmp = getenv("DEVICE_PORT")) != NULL) {
     char dp[10];
     char *ptr;
-    strncpy(dp, pTmp, 10);
-    memset(dp, '\0', sizeof(dp));
+    memset(dp, '\0', 10);
+    strncpy(dp, pTmp, 10 - 1);
     devicePort = strtol(dp, &ptr, 10);
     if (devicePort <= 0 || devicePort > 65535) {
       fprintf(stderr, "invalid DEVICE_PORT: %s\n", pTmp);
@@ -478,6 +485,16 @@ int setupEnv() {
 
   if ((pTmp = getenv("MACHINE_NAME")) != NULL) {
     sprintf(machineName, "%s", pTmp);
+  }
+
+  if ((pTmp = getenv("KAFKA_BROKERS")) != NULL) {
+    brokers = (char *)malloc(strlen(pTmp) + 1);
+    strcpy(brokers, pTmp);
+  }
+
+  if ((pTmp = getenv("KAFKA_TOPIC")) != NULL) {
+    topic = (char *)malloc(strlen(pTmp) + 1);
+    strcpy(topic, pTmp);
   }
 
   return 0;
@@ -528,11 +545,13 @@ int main(int argc, char **argv) {
   rd_kafka_t *rk;        /* Producer instance handle */
   rd_kafka_conf_t *conf; /* Temporary configuration object */
   char errstr[512];      /* librdkafka API error reporting buffer */
-  const char *brokers;   /* Argument: broker list */
-  const char *topic;     /* Argument: topic to produce to */
 
-  brokers = "localhost:9092";
-  topic = "input";
+  if (setupEnv()) {
+    fprintf(stderr, "failed to configure environment variables\n");
+    exit(EXIT_FAILURE);
+    return 1;
+  }
+  printf("using kafka brokers: \"%s\" and topic \"%s\"\n", brokers, topic);
 
   conf = rd_kafka_conf_new();
 
@@ -548,12 +567,6 @@ int main(int argc, char **argv) {
 
   if (!rk) {
     fprintf(stderr, "%% Failed to create new producer: %s\n", errstr);
-    exit(EXIT_FAILURE);
-    return 1;
-  }
-
-  if (setupEnv()) {
-    fprintf(stderr, "failed to configure environment variables\n");
     exit(EXIT_FAILURE);
     return 1;
   }

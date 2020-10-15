@@ -26,11 +26,12 @@ services:
     volumes:
       - kafka_data:/kafka/logs-1
   driver:
-    image: strangesast/fanuc-driver
+    image: strangesast/fanuc_driver
     network_mode: host
     restart: unless-stopped
     build:
       context: .
+      dockerfile: Dockerfile
 volumes:
   kafka_data:
   zookeeper_log:
