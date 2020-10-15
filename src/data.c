@@ -362,6 +362,39 @@ int getMachineProgram(MachineProgram *v, short programNum) {
   return 0;
 }
 
+int getMachineBlock(MachineBlock *v) {
+  short ret;
+  struct timespec t0, t1;
+  unsigned long tt;
+  char buf[1024];
+  unsigned short len = sizeof(buf);
+  short num;
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+
+  ret = cnc_rdexecprog(libh, (unsigned short *)&len, &num, buf);
+  if (ret != EW_OK) {
+    fprintf(stderr, "Failed read exec prog: %d!\n", ret);
+    return 1;
+  }
+  buf[len] = '\0';
+  for (int i = 0; i < len; i++) {
+    if (buf[i] == '\n') {
+      buf[i] = '\0';
+      break;
+    }
+  }
+
+  strncpy(v->block, buf, len);
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
+  v->executionDuration = tt;
+
+  return 0;
+}
+
 int setupConnection(char *deviceIP, int devicePort) {
   printf("using %s:%d\n", deviceIP, devicePort);
 

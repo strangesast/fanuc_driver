@@ -169,6 +169,7 @@ int checkMachinePartCount(cJSON *updates, cJSON *meta) {
     cJSON *count_datum = cJSON_CreateNumber(v->count);
     cJSON_AddItemToObject(updates, "part_count", count_datum);
   }
+
   cJSON *ed_meta_datum = cJSON_CreateNumber(v->executionDuration);
   cJSON_AddItemToObject(meta, "part_count", ed_meta_datum);
 
@@ -462,6 +463,33 @@ int checkMachineProgram(cJSON *updates, cJSON *meta) {
     lv = v;
     lastProgramNum = programNum;
   }
+  return 0;
+}
+
+int checkMachineBlock(cJSON *updates, cJSON *meta) {
+  static MachineBlock *lv = NULL;
+
+  MachineBlock *v;
+  v = malloc(sizeof(MachineBlock));
+
+  if (getMachineBlock(v)) {
+    fprintf(stderr, "failed to read machine block\n");
+    return 1;
+  }
+
+  if (lv == NULL || strcmp(lv->block, v->block) != 0) {
+    cJSON *block_datum = cJSON_CreateString(v->block);
+    cJSON_AddItemToObject(updates, "block", block_datum);
+  }
+
+  cJSON *ed_meta_datum = cJSON_CreateNumber(v->executionDuration);
+  cJSON_AddItemToObject(meta, "block", ed_meta_datum);
+
+  if (lv != NULL) {
+    free(lv);
+  }
+  lv = v;
+
   return 0;
 }
 
