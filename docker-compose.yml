@@ -25,13 +25,27 @@ services:
       - "9092:9092"
     volumes:
       - kafka_data:/kafka/logs-1
-  driver:
+  driver0:
     image: strangesast/fanuc_driver
     network_mode: host
     restart: unless-stopped
+    environment:
+      - DEVICE_IP=localhost
+      - DEVICE_PORT=8193
     build:
       context: .
       dockerfile: Dockerfile
+  driver1:
+    image: strangesast/fanuc_driver
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - DEVICE_IP=localhost
+      - DEVICE_PORT=8194
+    build:
+      context: .
+      dockerfile: Dockerfile
+
 volumes:
   kafka_data:
   zookeeper_log:

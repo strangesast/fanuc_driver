@@ -546,6 +546,8 @@ int main(int argc, char **argv) {
   rd_kafka_conf_t *conf; /* Temporary configuration object */
   char errstr[512];      /* librdkafka API error reporting buffer */
 
+  setbuf(stdout, NULL);
+
   if (setupEnv()) {
     fprintf(stderr, "failed to configure environment variables\n");
     exit(EXIT_FAILURE);
