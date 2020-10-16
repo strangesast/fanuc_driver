@@ -1,3 +1,4 @@
+import os
 from kafka import KafkaConsumer
 from collections import defaultdict
 from itertools import groupby
@@ -8,13 +9,18 @@ import json
 
 tz = pytz.timezone('US/Eastern')
 
-consumer = KafkaConsumer('input', bootstrap_servers='localhost:9092', auto_offset_reset='earliest')
+bootstrap_servers = os.environ.get('BOOTSTRAP_SERVERS', 'localhost:9092')
+print(f'using {bootstrap_servers=}')
+consumer = KafkaConsumer('input', bootstrap_servers=bootstrap_servers, auto_offset_reset='earliest')
 
 def check_pkey_distribution():
     last = set()
     d = defaultdict(int)
-    for i, msg in enumerate(consumer):
+    i = 0
+    while True:
+        msg, v = yield
         d[msg.key] += 1
+
         if msg.key not in last:
             print(msg.key)
             last.add(msg.key)
@@ -23,14 +29,15 @@ def check_pkey_distribution():
             print(i)
             pprint(d)
 
+        i += 1
+
 
 def check_value_key_distribution():
     total = 0
     d = defaultdict(int)
-    for i, msg in enumerate(consumer):
-        #print(dir(msg))
-        v = json.loads(msg.value)
-        #print(f'{msg.offset=} {msg.partition=}', v)
+    i = 0
+    while True:
+        msg, v = yield
     
         values, meta = v['values'], v['meta']
     
@@ -46,11 +53,14 @@ def check_value_key_distribution():
             print(i, total)
             pprint(sorted([tuple(p) for p in d.items()], key=lambda x: x[1]))
 
+        i += 1
+
 
 def check_meta_averages():
     d = defaultdict(lambda: (0, 0.0))
-    for i, msg in enumerate(consumer):
-        v = json.loads(msg.value)
+    i = 0
+    while True:
+        msg, v = yield
         values, meta = v['values'], v['meta']
         
         for k, v in meta.items():
@@ -62,18 +72,17 @@ def check_meta_averages():
             pprint(d)
             pprint(sorted([(k, t / n) for k, (n, t) in d.items()], key=lambda x: x[1]))
 
+        i += 1
 
-#check_value_key_distribution()
 
 def check_execution_changes():
-    def it():
-        for msg in consumer:
-            v = json.loads(msg.value)
-            values, meta = v['values'], v['meta']
-            yield (msg.offset, msg.timestamp, msg.key, values)
-    
     d = {}
-    for i, ts, k, v in it():
+    while True:
+        msg, v = yield
+
+        values, meta = v['values'], v['meta']
+        i, ts, k, v = msg.offset, msg.timestamp, msg.key, values
+
         if (n := v.get('execution')) is not None:
             a, b, _ = e if (e := d.get(k)) is not None else (None, None, None)
             if n != b:
@@ -86,27 +95,50 @@ def check_execution_changes():
 
 def check():
     d = {}
-    for i, msg in enumerate(consumer):
-        v = json.loads(msg.value)
-        values, meta = v['values'], v['meta']
+    while True:
+        msg, v = yield
     
         if msg.key in d and d[msg.key] > msg.timestamp:
             print('fuck')
             print(msg)
-            break
     
         d[msg.key] = msg.timestamp
 
 
 def check_key():
-    for i, msg in enumerate(consumer):
-        v = json.loads(msg.value)
+    i = 0
+    while True:
+        msg, v = yield
         values, meta = v['values'], v['meta']
     
         if (value := values.get('block')):
             print('value', value)
 
-#check_pkey_distribution()
-#check_value_key_distribution()
-check_execution_changes()
-#check_meta_averages()
+
+pkey_distribution = check_pkey_distribution()
+next(pkey_distribution)
+
+value_key_distribution = check_value_key_distribution()
+next(value_key_distribution)
+
+execution_changes = check_execution_changes()
+next(execution_changes)
+
+meta_averages = check_meta_averages()
+next(meta_averages)
+
+for msg in consumer:
+    try:
+        # "O0000%\xe8V\\u0018\xed\xe8V\\u0003"
+        v = json.loads(msg.value)
+    except Exception as e:
+        continue
+
+    p = (msg, v)
+
+    pkey_distribution.send(p)
+    #execution_changes.send(p)
+
+    value_key_distribution.send(p)
+    #meta_averages.send(p)
+
