@@ -22,8 +22,8 @@ Goals
     - Entire program contents
 
 
-
-Determine time remaining based on previous runs
+Determine percentage/ time remaining based on previous runs
+```
 +----------------------------------------------------+
 |                                                    |
 |  %                                                 |
@@ -42,3 +42,10 @@ Determine time remaining based on previous runs
 |  %                                                 |
 |                                                    |
 +----------------------------------------------------+
+
+Kafka --> Streams --> Connect -> "Raw" table (all columns + metadata)
+                  --> Activity Periods (part count?)
+                      --> Load profile
+                      --> Tool ids
+                      --> Line numbers / Blocks & Time (percent, time-to-go)
+```
