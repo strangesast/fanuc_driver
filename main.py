@@ -1,7 +1,7 @@
 """
 monitor machine table, monitor processes polling machines
 """
-import asyncpg
+#import asyncpg
 import asyncio
 import signal
 
@@ -9,9 +9,9 @@ from asyncio.subprocess import Process
 from contextlib import contextmanager
 from typing import Dict, Tuple
 from datetime import datetime
-import asyncpg  # type: ignore
-from aiohttp import web
-from aiojobs.aiohttp import setup, spawn  # type: ignore
+#import asyncpg  # type: ignore
+#from aiohttp import web
+#from aiojobs.aiohttp import setup, spawn  # type: ignore
 import fwlib  # type: ignore
 
 async def init_db(app):
@@ -47,7 +47,7 @@ tasks = {}
 async def create_proc(id, machine_ip, machine_port):
     try:
         while True:
-            proc = await asyncio.create_subprocess_shell(f'while true; do echo "{id=} {machine_ip=} {machine_port=}"; sleep 1; done', stdout=asyncio.subprocess.PIPE)
+            proc = await asyncio.create_subprocess_shell('while true; do echo "{} {} {}"; sleep 1; done'.format(id, machine_id, machine_port), stdout=asyncio.subprocess.PIPE)
             async for line in proc.stdout:
                 print('line', line)
             await asyncio.sleep(5)
@@ -65,7 +65,7 @@ async def init_tasks(app: web.Application):
 
 
 async def start_background_tasks(app):
-    app['db'] = await asyncpg.create_pool(user='postgres', password='password', database='testing')
+    #app['db'] = await asyncpg.create_pool(user='postgres', password='password', database='testing')
     await init_db(app)
     await init_tasks(app)
 
@@ -255,9 +255,9 @@ async def looper(_app: web.Application):
 
 async def start_background_tasks(_app):
     """background task start callback"""
-    _app["db"] = await asyncpg.connect(
-        "postgresql://postgres:password@localhost/testing"
-    )
+    #_app["db"] = await asyncpg.connect(
+    #    "postgresql://postgres:password@localhost/testing"
+    #)
     _app["loop"] = asyncio.create_task(looper(_app))
 
 
