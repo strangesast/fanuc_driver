@@ -1,0 +1,30 @@
+version: '3.7'
+services:
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/:/docker-entrypoint-initdb.d/
+      - db_data:/var/lib/postgresql/data
+    environment:
+      - DATABASE_NAME=testing
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - "8081:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin
+      - PGADMIN_DEFAULT_PASSWORD=Password1234
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+  app:
+    network_mode: host
+    build:
+      context: .
+      dockerfile: Dockerfile
+volumes:
+  db_data:
+  pgadmin_data:
