@@ -1,0 +1,46 @@
+plugins {
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.71'
+    id 'idea'
+    id 'com.commercehub.gradle.plugin.avro' version '0.20.0'
+    id 'com.github.johnrengelman.shadow' version '5.2.0' // pack into single jar (shadowJar)
+    id 'application'
+}
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+mainClassName = "main/SerialMonitoringStreamProcessingKt"
+
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+    implementation 'com.google.code.gson:gson:2.8.6'
+
+    compile group: 'javax.annotation', name: 'javax.annotation-api', version: '1.3.2'
+
+    compile group: 'org.apache.avro', name: 'avro', version: '1.10.0'
+    compile group: 'org.apache.kafka', name: 'kafka_2.13', version: '2.5.0'
+    compile group: 'org.apache.kafka', name: 'kafka-streams', version: '2.5.0'
+
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '2.0.0-alpha1'
+    compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '2.0.0-alpha1'
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+}

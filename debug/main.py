@@ -136,9 +136,9 @@ for msg in consumer:
 
     p = (msg, v)
 
-    pkey_distribution.send(p)
-    #execution_changes.send(p)
+    #pkey_distribution.send(p)
+    execution_changes.send(p)
 
-    value_key_distribution.send(p)
+    #value_key_distribution.send(p)
     #meta_averages.send(p)
 

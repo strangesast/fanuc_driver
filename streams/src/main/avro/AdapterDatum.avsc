@@ -1,0 +1,70 @@
+{
+  "type": "record",
+  "name": "AdapterDatum",
+  "fields": [
+    {"name": "values", "type": {
+      "type": "record",
+      "name": "AdapterDatumValues",
+      "fields": [
+        {"name": "max_axis",       "default": null, "type": ["null", "int"]},
+        {"name": "addinfo",        "default": null, "type": ["null", "int"]},
+        {"name": "cnc_type",       "default": null, "type": ["null", "string"]},
+        {"name": "mt_type",        "default": null, "type": ["null", "string"]},
+        {"name": "series",         "default": null, "type": ["null", "string"]},
+        {"name": "version",        "default": null, "type": ["null", "string"]},
+        {"name": "axes_count_chk", "default": null, "type": ["null", "string"]},
+        {"name": "axes_count",     "default": null, "type": ["null", "int"]},
+        {"name": "ether_type",     "default": null, "type": ["null", "int"]},
+        {"name": "ether_device",   "default": null, "type": ["null", "int"]},
+        {"name": "axes",           "default": null, "type": ["null", {
+          "type": "array",
+          "items": {
+            "type": "record",
+            "name": "AdapterDatumAxesDef",
+            "fields": [
+              {"name": "id",      "type": "string"},
+              {"name": "name",    "type": "string"},
+              {"name": "index",   "type": "int"},
+              {"name": "suffix",  "type": "string"},
+              {"name": "divisor", "type": "long"},
+              {"name": "flag",    "type": "int"},
+              {"name": "unit",    "type": "int"},
+              {"name": "unith",   "type": "string"},
+              {"name": "decimal", "type": "int"}
+            ]
+          },
+          "default": []
+        }]},
+        {"name": "alarm",          "default": null, "type": ["null", "int"]},
+        {"name": "hdck",           "default": null, "type": ["null", "int"]},
+        {"name": "tool_group",     "default": null, "type": ["null", "int"]},
+        {"name": "message_number", "default": null, "type": ["null", "int"]},
+        {"name": "message_text",   "default": null, "type": ["null", "string"]},
+        {"name": "mprogram",       "default": null, "type": ["null", "int"]},
+        {"name": "part_count",     "default": null, "type": ["null", "long"]},
+        {"name": "mode",           "default": null, "type": ["null", "string"]},
+        {"name": "estop",          "default": null, "type": ["null", "string"]},
+        {"name": "aut",            "default": null, "type": ["null", "int"]},
+        {"name": "emergency",      "default": null, "type": ["null", "int"]},
+        {"name": "run",            "default": null, "type": ["null", "int"]},
+        {"name": "execution",      "default": null, "type": ["null", "string"]},
+        {"name": "tool_id",        "default": null, "type": ["null", "int"]},
+        {"name": "sequence",       "default": null, "type": ["null", "int"]},
+        {"name": "cprogram",       "default": null, "type": ["null", "int"]},
+        {"name": "program_number", "default": null, "type": ["null", "int"]},
+        {"name": "program_header", "default": null, "type": ["null", "string"]},
+        {"name": "mstb",           "default": null, "type": ["null", "int"]},
+        {"name": "edit",           "default": null, "type": ["null", "int"]},
+        {"name": "block",          "default": null, "type": ["null", "string"]},
+        {"name": "motion",         "default": null, "type": ["null", "int"]},
+        {"name": "actf",           "default": null, "type": ["null", "long"]},
+        {"name": "acts",           "default": null, "type": ["null", "long"]},
+        {"name": "actual",         "default": null, "type": ["null", {"type": "array", "items": "double"}]},
+        {"name": "relative",       "default": null, "type": ["null", {"type": "array", "items": "double"}]},
+        {"name": "absolute",       "default": null, "type": ["null", {"type": "array", "items": "double"}]},
+        {"name": "load",           "default": null, "type": ["null", {"type": "array", "items": "int"}]}
+      ]
+    }},
+    {"name": "meta", "type": {"type": "map", "values": "long"}}
+  ]
+}
