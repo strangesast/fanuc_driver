@@ -10,9 +10,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../external/cJSON/cJSON.h"
-#include "../external/fwlib/fwlib32.h"
-#include "../external/librdkafka/src/rdkafka.h"
+#include "../../external/cJSON/cJSON.h"
+#include "../../external/fwlib/fwlib32.h"
+#include "../../external/librdkafka/src/rdkafka.h"
 #include "./data.h"
 
 #define MAXLEN 128
@@ -550,8 +550,7 @@ int loop_tick(cJSON *updates, cJSON *meta) {
       checkMachineToolInfo(updates, meta) ||
       checkMachineDynamic(updates, meta) ||
       checkMachineMessage(updates, meta) ||
-      checkMachineProgram(updates, meta) ||
-      checkMachineBlock(updates, meta)) {
+      checkMachineProgram(updates, meta) || checkMachineBlock(updates, meta)) {
     fprintf(stderr, "failed to check machine values\n");
     return 1;
   }
