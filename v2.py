@@ -9,14 +9,27 @@ async def init(pool):
         await con.execute('''
             drop table if exists machine_monitor;
             create table machine_monitor(
-              id           text,
+              machine_id   text PRIMARY KEY,
               machine_ip   varchar(40),
               machine_port integer
+            );
+            create table machine_monitor_status(
+              id          serial
+              machine_id  text
+              status      varchar(100)
+              ts          timestamp default current_timestamp
             );
             insert into machine_monitor(id,machine_ip,machine_port) values ('test','localhost',8193);
         ''')
 
-async def monitor_machine(machine_id, machine_ip, machine_port):
+
+async def update_status(pool: asyncpg.Pool, machine_id, status):
+    con.execute('''
+        insert into machine_monitor_status(machine_id,status) values ($1,$2)
+    ''', machine_id, status)
+
+
+async def monitor_machine(pool: asyncpg.Pool, machine_id, machine_ip, machine_port):
     try:
         for i in itertools.count(0):
             print(machine_id, 'RESTARTING' if i > 0 else 'STARTING')
