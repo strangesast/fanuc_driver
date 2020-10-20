@@ -1,10 +1,1 @@
-aiohttp==3.6.2
-aiojobs==0.2.2
-async-timeout==3.0.1
 asyncpg==0.21.0
-attrs==20.2.0
-chardet==3.0.4
--e git+https://github.com/strangesast/fanuc-python-extension.git@f448c95afbda4f4927f3c32f721d19f94c1733da#egg=fwlib
-idna==2.10
-multidict==4.7.6
-yarl==1.6.0

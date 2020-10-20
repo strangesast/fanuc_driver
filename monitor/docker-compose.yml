@@ -17,14 +17,14 @@ services:
       - "8081:80"
     environment:
       - PGADMIN_DEFAULT_EMAIL=admin@admin
-      - PGADMIN_DEFAULT_PASSWORD=Password1234
+      - PGADMIN_DEFAULT_PASSWORD=PasswordPassword123123
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-  app:
-    network_mode: host
-    build:
-      context: .
-      dockerfile: Dockerfile
+#  app:
+#    network_mode: host
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
 volumes:
   db_data:
   pgadmin_data:
