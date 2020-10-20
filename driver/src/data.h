@@ -1,4 +1,4 @@
-#include "../../external/fwlib/fwlib32.h"
+#include "../external/fwlib/fwlib32.h"
 
 typedef struct MachineAxisInfo {
   char id[2];

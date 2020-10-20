@@ -10,9 +10,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../../external/cJSON/cJSON.h"
-#include "../../external/fwlib/fwlib32.h"
-#include "../../external/librdkafka/src/rdkafka.h"
+#include "../external/cJSON/cJSON.h"
+#include "../external/fwlib/fwlib32.h"
+#include "../external/librdkafka/src/rdkafka.h"
 #include "./data.h"
 
 #define MAXLEN 128

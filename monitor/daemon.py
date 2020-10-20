@@ -1,6 +1,8 @@
+import os
 import asyncio
 import asyncpg
 import itertools
+from datetime import datetime
 import json
 
 
@@ -95,12 +97,13 @@ class AdapterMonitor:
                         await con.execute(
                             """
                             update machine_monitor_status
-                            set status_id=$2, status_text=$3
+                            set ts=$4, status_id=$2, status_text=$3
                             where machine_id=$1
                         """,
                             machine_id,
                             status_id,
                             status,
+                            datetime.utcnow()
                         )
                 self.status_queue.task_done()
         except asyncio.CancelledError:
@@ -111,9 +114,8 @@ class AdapterMonitor:
     ):
         try:
             for i in itertools.count(0):
-                await self.status_queue.put(
-                    (machine_id, "RESTARTING" if i > 0 else "STARTING", None)
-                )
+                s = "RESTARTING" if i > 0 else "STARTING"
+                await self.status_queue.put((machine_id, s, None))
                 args = [
                     self.executable,
                     f"{machine_id=}",
@@ -218,37 +220,15 @@ class AdapterMonitor:
             await status_task
 
 
-class TestAdapterMonitor(AdapterMonitor):
-    executable = "./mock-test.sh"
-
-    async def init_db(self, con: asyncpg.Connection):
-        await con.execute(
-            """
-            drop table if exists machine_monitor_status_updates CASCADE;
-            drop table if exists machine_monitor CASCADE;
-            drop table if exists machine_monitor_status;
-        """
-        )
-        await AdapterMonitor.init_db(self, con)
-        await con.execute(
-            """
-           insert into machine_monitor(machine_id,machine_ip,machine_port)
-           values ('test','localhost',8193);
-           insert into machine_monitor_status(machine_id)
-           values ('test');
-        """
-        )
-
-
 if __name__ == "__main__":
     # asyncio.run cancels tasks before main soo
 
-    o = TestAdapterMonitor()
+    o = AdapterMonitor()
     loop = asyncio.new_event_loop()
 
-    loop.run_until_complete(
-        o.connect("postgresql://postgres:password@localhost:5432/testing")
-    )
+    dsn = os.environ.get("POSTGRES_DSN",
+        "postgresql://postgres:password@localhost:5432/development")
+    loop.run_until_complete(o.connect(dsn))
 
     task = loop.create_task(o.run())
     try:

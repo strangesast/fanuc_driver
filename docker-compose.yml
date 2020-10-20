@@ -74,6 +74,22 @@ services:
       - DATABASE_URL=postgresql://localhost:5432/testing
       - FLUSH_INTERVAL=1000
 
+  api:
+    image: strangesast/fanuc_driver-api
+    network_mode: host
+    build:
+      context: .
+      dockerfile: docker/monitor/api.Dockerfile
+
+  daemon:
+    image: strangesast/fanuc_driver-daemon
+    network_mode: host
+    build:
+      context: .
+      dockerfile: docker/monitor/daemon.Dockerfile
+    environment:
+      - POSTGRES_DSN=postgres://localhost:5432/testing
+
 #  driver0:
 #    image: strangesast/fanuc_driver
 #    network_mode: host

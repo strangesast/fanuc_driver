@@ -4,12 +4,12 @@ run apt-get update && apt-get install -y librdkafka-dev:i386
 
 from base as builder
 
-copy ./external/fwlib/build-deps.sh /tmp/
+copy ./driver/external/fwlib/build-deps.sh /tmp/
 run /tmp/build-deps.sh
 
 workdir /usr/src/app
 
-copy . .
+copy driver/ .
 
 run mkdir build && \
   cd build && \

@@ -1,6 +1,9 @@
+[submodule "external/fwlib"]
+	path = driver/external/fwlib
+	url = https://github.com/strangesast/fwlib.git
 [submodule "external/cJSON"]
-	path = external/cJSON
+	path = driver/external/cJSON
 	url = https://github.com/DaveGamble/cJSON.git
 [submodule "external/librdkafka"]
-	path = external/librdkafka
+	path = driver/external/librdkafka
 	url = https://github.com/edenhill/librdkafka.git
