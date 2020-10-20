@@ -5,7 +5,8 @@ while true; do
   i=$(($i + 1))
   val=$(($RANDOM % 10 + 1 | bc))
   if (( $val < 2 )); then
-    exit 1
+    >&2 echo "task failed successfully!";
+    exit 1;
   fi
-  sleep 1
+  sleep 1;
 done
