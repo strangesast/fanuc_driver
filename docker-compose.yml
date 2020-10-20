@@ -2,7 +2,6 @@ version: '3.7'
 services:
 #  zookeeper:
 #    image: wurstmeister/zookeeper
-#    restart: always
 #    ports:
 #      - "2181:2181"
 #    volumes:
@@ -10,7 +9,6 @@ services:
 #      - zookeeper_log:/opt/zookeeper-3.4.13/conf
 #  kafka:
 #    image: wurstmeister/kafka
-#    restart: always
 #    environment:
 #      KAFKA_BROKER_ID: 1
 #      KAFKA_LOG_DIRS: /kafka/logs-1
@@ -27,7 +25,7 @@ services:
 #      - kafka_data:/kafka/logs-1
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:5.5.0
+    image: confluentinc/cp-schema-registry:6.0.0
     network_mode: host
     ports:
       - "8081:8081"
@@ -39,8 +37,8 @@ services:
     image: postgres
     ports:
       - "5432:5432"
-    volumes:
-      - ./sql/:/docker-entrypoint-initdb.d/
+#    volumes:
+#      - ./sql/:/docker-entrypoint-initdb.d/
 #      - db_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=testing
@@ -49,7 +47,6 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4
-    restart: always
     ports:
       - "8090:80"
     environment:
@@ -59,7 +56,6 @@ services:
       - pgadmin_data:/var/lib/pgadmin
 
   streams:
-#    restart: always
     network_mode: host
     build:
       context: streams
@@ -68,11 +64,11 @@ services:
       - STREAMS_APPLICATION_ID=streams-monitoring
 
   connect:
-#    image: strangesast/fanuc_driver-connect
-#    restart: always
+    image: strangesast/fanuc_driver-connect
     network_mode: host
     build:
-      context: connect
+      context: .
+      dockerfile: docker/connect/Dockerfile
     environment:
       - KAFKA_HOSTS=localhost:9092
       - DATABASE_URL=postgresql://localhost:5432/testing
@@ -98,9 +94,21 @@ services:
 #    build:
 #      context: .
 #      dockerfile: Dockerfile
+  jupyter:
+    image: jupyter/datascience-notebook
+    restart: always
+    ports:
+      - "8888:8888"
+    environment:
+      - NB_USER=user
+      - PASSWORD=PasswordPassword123123
+    volumes:
+      - jupyter_data:/home/user/work
 
 volumes:
   kafka_data:
   zookeeper_log:
   zookeeper_data:
   pgadmin_data:
+  jupyter_data:
+    external: true
