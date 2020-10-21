@@ -2,6 +2,7 @@ package main
 
 import AdapterDatum
 import AdapterDatumSer
+import ExecutionDatum
 import com.google.gson.Gson
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -44,9 +45,8 @@ fun main() {
     props[StreamsConfig.BOOTSTRAP_SERVERS_CONFIG] = System.getenv("KAFKA_HOSTS") ?: "localhost:9092"
     props[StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG] = Serdes.String().javaClass
     props[StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG] = Serdes.String().javaClass
+    props[StreamsConfig.PROCESSING_GUARANTEE_CONFIG] = "exactly_once"
     props[AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG] = schemaRegistryUrl
-
-
     props[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = "earliest"
     props[StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG] = 0
 
@@ -60,17 +60,33 @@ fun main() {
         schemaRegistryUrl
     )
 
-    val valueSpecificAvroSerde: Serde<AdapterDatumSer> = SpecificAvroSerde()
-    valueSpecificAvroSerde.configure(serdeConfig, false)
+    val adapterDatumSerde: Serde<AdapterDatumSer> = SpecificAvroSerde()
+    adapterDatumSerde.configure(serdeConfig, false)
+
+    val executionDatumSerde: Serde<ExecutionDatum> = SpecificAvroSerde()
+    executionDatumSerde.configure(serdeConfig, false)
 
     val input = builder
         .stream("input", Consumed.with(Serdes.String(), Serdes.String()))
 
-    input
+    val vals = input
         .mapValues { str -> gson.fromJson(str, AdapterDatum::class.java) }
         .transform(TransformerSupplier { AdapterDatumTransformer() })
-        .to("input-avro", Produced.with(Serdes.String(), valueSpecificAvroSerde))
 
+    vals.to("input-avro", Produced.with(Serdes.String(), adapterDatumSerde))
+
+    vals
+        .filterNot { _, value -> value.getExecution().isNullOrEmpty() }
+        .mapValues { value ->
+            ExecutionDatum.newBuilder()
+                .setMachineId(value.machineId)
+                .setExecution(value.getExecution())
+                .setTimestamp(value.getTimestamp())
+                .setPartition(value.getPartition())
+                .setOffset(value.getOffset())
+                .build()
+        }
+        .to("execution", Produced.with(Serdes.String(), executionDatumSerde))
     /*
     input.map { key, str ->
         val d = gson.fromJson(str, AdapterDatum::class.java)
@@ -121,12 +137,18 @@ class AdapterDatumTransformer : Transformer<String, AdapterDatum, KeyValue<Strin
     }
 }
 
-fun convertAdapterDatum(machineID: String, datum: AdapterDatum, offset: Long, timestamp: Long, partition: Int): AdapterDatumSer {
+fun convertAdapterDatum(
+    machineID: String,
+    datum: AdapterDatum,
+    offset: Long,
+    timestamp: Long,
+    partition: Int
+): AdapterDatumSer {
     val out = AdapterDatumSer.newBuilder()
-    out.setMachineId(machineID)
-    out.setOffset(offset)
-    out.setTimestamp(timestamp)
-    out.setPartition(partition)
+    out.machineId = machineID
+    out.offset = offset
+    out.timestamp = timestamp
+    out.partition = partition
     val _meta = datum.getMeta()
     val _in = datum.getValues()
     out.maxAxis = _in.maxAxis
@@ -189,207 +211,3 @@ fun convertAdapterDatum(machineID: String, datum: AdapterDatum, offset: Long, ti
     out.metaTotal = _meta.getOrDefault("total", -1)
     return out.build()
 }
-
-data class ConnectSchemaField(
-    val type: String,
-    val optional: Boolean,
-    val field: String
-)
-
-data class ConnectSchemaAndPayload(
-    val schema: ConnectSchema,
-    val payload: Any
-)
-
-data class ConnectSchema(
-    val type: String,
-    val fields: List<ConnectSchemaField>,
-    val optional: Boolean,
-    val name: String
-)
-
-/*
-fun buildStreamsTopology(raw: KStream<String, String>) {
-    // val splitSampleSerde = AvroMessageSerde(SplitSample.getEncoder(), SplitSample.getDecoder())
-    val sampleKeySerde = AvroMessageSerde(SampleKey.getEncoder(), SampleKey.getDecoder())
-    val sampleValueSerde = AvroMessageSerde(SampleValue.getEncoder(), SampleValue.getDecoder())
-
-    val (tabledStream, streamed) = splitSamples.branch(
-        Predicate { _, sample ->
-            sample.getKey() in setOf(
-                "execution",
-                "part_count",
-                "avail",
-                "estop",
-                "mode",
-                "active_axis",
-                "tool_id",
-                "program",
-                "program_comment",
-                "line",
-                "block" /* ehhhh */,
-                "Fovr",
-                "message",
-                "servo",
-                "comms",
-                "logic",
-                "motion",
-                "system",
-                "Xtravel",
-                "Xoverheat",
-                "Xservo",
-                "Ztravel",
-                "Zoverheat",
-                "Zservo",
-                "Ctravel",
-                "Coverheat",
-                "Cservo",
-                "S1servo",
-                "S2servo"
-            )
-        },
-        Predicate { _, sample ->
-            sample.getKey() in setOf(
-                "Xload",
-                "Zload",
-                "Cload",
-                "S1load",
-                "S2load",
-                "Zact",
-                "Xact",
-                "Cact",
-                "S2speed",
-                "S1speed",
-                "path_position",
-                "path_feedrate"
-            )
-        }
-    )
-
-    val tabled = tabledStream
-        .map { key, value ->
-            KeyValue(
-                SampleKey.newBuilder().setMachineID(key).setProperty(value.getKey()).build(),
-                SampleValue.newBuilder().setValue(value.getValue()).setOffset(value.getOffset())
-                    .setTimestamp(value.getTimestamp()).build()
-            )
-        }
-        .toTable(Materialized.with(sampleKeySerde, sampleValueSerde))
-
-    /*
-    val (executionState, partCountState, programCommentState) = tabled.toStream().branch(
-            Predicate { key, _ -> key.getProperty() == "execution" },
-            Predicate { key, _ -> key.getProperty() == "part_count" },
-            Predicate { key, _ -> key.getProperty() == "program_comment"}
-    )
-     */
-
-
-    // program comment regex
-    // val pat0 = Pattern.compile("^(%\\s{0,2})?(?<num>O[0-9]{3,6})\\s*(?<notes>(\\([\\s\\w\\- \\.\\/]+\\)\\s{0,3})+)")
-    // val pat1 = Pattern.compile("\\([\\s\\w\\-\\.\\/]+\\)")
-
-    tabled.toStream().map { k, v ->
-        KeyValue(
-            gson.toJson(
-                ConnectSchemaAndPayload(
-                    ConnectSchema(
-                        "struct",
-                        listOf(
-                            ConnectSchemaField(
-                                "string",
-                                false,
-                                "machine_id"
-                            ),
-                            ConnectSchemaField(
-                                "string",
-                                false,
-                                "property"
-                            ),
-                            ConnectSchemaField(
-                                "int64",
-                                false,
-                                "offset"
-                            )
-                        ),
-                        false,
-                        "machine_state_key"
-                    ),
-                    mapOf("machine_id" to k.getMachineID(), "property" to k.getProperty(), "offset" to v.getOffset())
-                )
-            ),
-            gson.toJson(
-                ConnectSchemaAndPayload(
-                    ConnectSchema(
-                        "struct",
-                        listOf(
-                            ConnectSchemaField(
-                                "string",
-                                true,
-                                "value"
-                            ),
-                            ConnectSchemaField(
-                                "int64",
-                                true,
-                                "timestamp"
-                            )
-                        ),
-                        false,
-                        "machine_state_value"
-                    ),
-                    mapOf("value" to v.getValue(), "timestamp" to v.getTimestamp())
-                )
-            )
-        )
-    }.to("machine_state", Produced.with(Serdes.String(), Serdes.String()))
-
-    streamed.map { machineId, record ->
-        KeyValue(
-            "$machineId-${record.getKey()}", gson.toJson(
-                ConnectSchemaAndPayload(
-                    ConnectSchema(
-                        "struct",
-                        listOf(
-                            ConnectSchemaField(
-                                "string",
-                                false,
-                                "machine_id"
-                            ),
-                            ConnectSchemaField(
-                                "string",
-                                false,
-                                "property"
-                            ),
-                            ConnectSchemaField(
-                                "int64",
-                                false,
-                                "timestamp"
-                            ),
-                            ConnectSchemaField(
-                                "string",
-                                false,
-                                "value"
-                            ),
-                            ConnectSchemaField(
-                                "int64",
-                                false,
-                                "offset"
-                            )
-                        ),
-                        false,
-                        "machine_values_value"
-                    ),
-                    mapOf(
-                        "machine_id" to machineId,
-                        "property" to record.getKey(),
-                        "timestamp" to record.getTimestamp(),
-                        "value" to record.getValue(),
-                        "offset" to record.getOffset()
-                    )
-                )
-            )
-        )
-    }.to("machine_values", Produced.with(Serdes.String(), Serdes.String()))
-}
-
-*/

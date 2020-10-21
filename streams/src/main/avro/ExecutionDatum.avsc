@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "ExecutionDatum",
+  "fields": [
+    {"name": "machine_id", "type": "string"},
+    {"name": "execution",  "type": "string"},
+    {"name": "timestamp",  "type": "long"},
+    {"name": "offset",     "type": "long"},
+    {"name": "partition",  "type": "int"}
+  ]
+}

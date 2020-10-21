@@ -24,34 +24,36 @@ services:
 #    volumes:
 #      - kafka_data:/kafka/logs-1
 
-  schema-registry:
-    image: confluentinc/cp-schema-registry:6.0.0
-    network_mode: host
-    ports:
-      - "8081:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'localhost:9092'
+#  schema-registry:
+#    image: confluentinc/cp-schema-registry:6.0.0
+#    network_mode: host
+#    ports:
+#      - "8081:8081"
+#    environment:
+#      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+#      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'localhost:9092'
 
-  postgres:
-    image: postgres
-    ports:
-      - "5432:5432"
-#    volumes:
-#      - ./sql/:/docker-entrypoint-initdb.d/
-#      - db_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=testing
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+#  postgres:
+#    image: postgres
+#    ports:
+#      - "5432:5432"
+##    volumes:
+##      - ./sql/:/docker-entrypoint-initdb.d/
+##      - db_data:/var/lib/postgresql/data
+#    environment:
+#      - POSTGRES_DB=testing
+#      - POSTGRES_USER=postgres
+#      - POSTGRES_PASSWORD=password
 
   pgadmin:
     image: dpage/pgadmin4
-    ports:
-      - "8090:80"
+    network_mode: host
+#    ports:
+#      - "8090:80"
     environment:
       - PGADMIN_DEFAULT_EMAIL=admin@admin
       - PGADMIN_DEFAULT_PASSWORD=PasswordPassword123123
+      - PGADMIN_LISTEN_PORT=8090
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
@@ -63,16 +65,16 @@ services:
 #      - KAFKA_HOSTS=localhost:9092
 #      - STREAMS_APPLICATION_ID=streams-monitoring
 
-  connect:
-    image: strangesast/fanuc_driver-connect
-    network_mode: host
-    build:
-      context: .
-      dockerfile: docker/connect/Dockerfile
-    environment:
-      - KAFKA_HOSTS=localhost:9092
-      - DATABASE_URL=postgresql://localhost:5432/testing
-      - FLUSH_INTERVAL=1000
+#  connect:
+#    image: strangesast/fanuc_driver-connect
+#    network_mode: host
+#    build:
+#      context: .
+#      dockerfile: docker/connect/Dockerfile
+#    environment:
+#      - KAFKA_HOSTS=localhost:9092
+#      - DATABASE_URL=postgresql://localhost:5432/testing
+#      - FLUSH_INTERVAL=1000
 
 #  api:
 #    image: strangesast/fanuc_driver-api
@@ -112,6 +114,7 @@ services:
 #      dockerfile: Dockerfile
   jupyter:
     image: jupyter/datascience-notebook
+    network_mode: host
     restart: always
     ports:
       - "8888:8888"
