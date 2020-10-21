@@ -5,6 +5,8 @@ import itertools
 from datetime import datetime
 import json
 
+DEFAULT_DSN = "postgresql://postgres:password@localhost:5432/development"
+
 
 class AdapterMonitor:
     tasks: dict[str, asyncio.Task] = {}
@@ -68,7 +70,7 @@ class AdapterMonitor:
           END;
         $$ LANGUAGE plpgsql;
 
-        CREATE TRIGGER notify_event
+        CREATE OR REPLACE TRIGGER notify_event
         AFTER INSERT OR UPDATE OR DELETE ON machine_monitor
         FOR EACH ROW EXECUTE PROCEDURE notify_event();
 
@@ -103,7 +105,7 @@ class AdapterMonitor:
                             machine_id,
                             status_id,
                             status,
-                            datetime.utcnow()
+                            datetime.utcnow(),
                         )
                 self.status_queue.task_done()
         except asyncio.CancelledError:
@@ -226,8 +228,7 @@ if __name__ == "__main__":
     o = AdapterMonitor()
     loop = asyncio.new_event_loop()
 
-    dsn = os.environ.get("POSTGRES_DSN",
-        "postgresql://postgres:password@localhost:5432/development")
+    dsn = os.environ.get("POSTGRES_DSN", DEFAULT_DSN)
     loop.run_until_complete(o.connect(dsn))
 
     task = loop.create_task(o.run())

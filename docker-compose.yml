@@ -55,13 +55,13 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
-  streams:
-    network_mode: host
-    build:
-      context: streams
-    environment:
-      - KAFKA_HOSTS=localhost:9092
-      - STREAMS_APPLICATION_ID=streams-monitoring
+#  streams:
+#    network_mode: host
+#    build:
+#      context: streams
+#    environment:
+#      - KAFKA_HOSTS=localhost:9092
+#      - STREAMS_APPLICATION_ID=streams-monitoring
 
   connect:
     image: strangesast/fanuc_driver-connect
@@ -74,21 +74,21 @@ services:
       - DATABASE_URL=postgresql://localhost:5432/testing
       - FLUSH_INTERVAL=1000
 
-  api:
-    image: strangesast/fanuc_driver-api
-    network_mode: host
-    build:
-      context: .
-      dockerfile: docker/monitor/api.Dockerfile
-
-  daemon:
-    image: strangesast/fanuc_driver-daemon
-    network_mode: host
-    build:
-      context: .
-      dockerfile: docker/monitor/daemon.Dockerfile
-    environment:
-      - POSTGRES_DSN=postgres://localhost:5432/testing
+#  api:
+#    image: strangesast/fanuc_driver-api
+#    network_mode: host
+#    build:
+#      context: .
+#      dockerfile: docker/monitor/api.Dockerfile
+#
+#  daemon:
+#    image: strangesast/fanuc_driver-daemon
+#    network_mode: host
+#    build:
+#      context: .
+#      dockerfile: docker/monitor/daemon.Dockerfile
+#    environment:
+#      - POSTGRES_DSN=postgres://localhost:5432/testing
 
 #  driver0:
 #    image: strangesast/fanuc_driver
@@ -122,9 +122,9 @@ services:
       - jupyter_data:/home/user/work
 
 volumes:
-  kafka_data:
-  zookeeper_log:
-  zookeeper_data:
+#  kafka_data:
+#  zookeeper_log:
+#  zookeeper_data:
   pgadmin_data:
   jupyter_data:
     external: true

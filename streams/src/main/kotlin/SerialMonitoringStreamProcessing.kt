@@ -19,6 +19,9 @@ import kotlin.system.exitProcess
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
 import org.apache.avro.Schema
 import org.apache.kafka.streams.KeyValue
+import org.apache.kafka.streams.kstream.Transformer
+import org.apache.kafka.streams.kstream.TransformerSupplier
+import org.apache.kafka.streams.processor.ProcessorContext
 
 val FIELDS = listOf(
     "max_axis", "addinfo", "cnc_type", "mt_type", "series", "version",
@@ -63,11 +66,17 @@ fun main() {
     val input = builder
         .stream("input", Consumed.with(Serdes.String(), Serdes.String()))
 
+    input
+        .mapValues { str -> gson.fromJson(str, AdapterDatum::class.java) }
+        .transform(TransformerSupplier { AdapterDatumTransformer() })
+        .to("input-avro", Produced.with(Serdes.String(), valueSpecificAvroSerde))
+
+    /*
     input.map { key, str ->
         val d = gson.fromJson(str, AdapterDatum::class.java)
         KeyValue(key, convertAdapterDatum(key, d))
     }
-        .to("input-avro", Produced.with(Serdes.String(), valueSpecificAvroSerde))
+    */
 
     // t.foreach { key, value ->
     //     logger.info("key=$key value=${value.toString()}")
@@ -94,9 +103,30 @@ fun main() {
     exitProcess(0)
 }
 
-fun convertAdapterDatum(machineID: String, datum: AdapterDatum): AdapterDatumSer {
+class AdapterDatumTransformer : Transformer<String, AdapterDatum, KeyValue<String, AdapterDatumSer>> {
+    private lateinit var context: ProcessorContext
+
+    override fun init(context: ProcessorContext) {
+        this.context = context
+    }
+
+    override fun transform(key: String, value: AdapterDatum): KeyValue<String, AdapterDatumSer> {
+        val offset = context.offset()
+        val timestamp = context.timestamp()
+        val partition = context.partition()
+        return KeyValue(key, convertAdapterDatum(key, value, offset, timestamp, partition))
+    }
+
+    override fun close() {
+    }
+}
+
+fun convertAdapterDatum(machineID: String, datum: AdapterDatum, offset: Long, timestamp: Long, partition: Int): AdapterDatumSer {
     val out = AdapterDatumSer.newBuilder()
     out.setMachineId(machineID)
+    out.setOffset(offset)
+    out.setTimestamp(timestamp)
+    out.setPartition(partition)
     val _meta = datum.getMeta()
     val _in = datum.getValues()
     out.maxAxis = _in.maxAxis

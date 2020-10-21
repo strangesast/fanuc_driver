@@ -21,6 +21,36 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     volumes:
       - kafka_data:/kafka/logs-1
+  postgres:
+    image: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+#      - ./sql/:/docker-entrypoint-initdb.d/
+      - db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=testing
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+  connect:
+    image: strangesast/fanuc_driver-connect
+    network_mode: host
+    build:
+      context: .
+      dockerfile: docker/connect/Dockerfile
+    environment:
+      - KAFKA_HOSTS=kafka:29092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - DATABASE_URL=postgresql://postgres:5432/testing
+      - FLUSH_INTERVAL=1000
+  schema-registry:
+    image: confluentinc/cp-schema-registry:6.0.0
+    network_mode: host
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:29092'
   driver0:
     image: strangesast/fanuc_driver
     restart: unless-stopped
@@ -77,6 +107,8 @@ services:
       dockerfile: Dockerfile
 
 volumes:
+  db_data:
+    external: true
   kafka_data:
     external: true
   zookeeper_log:

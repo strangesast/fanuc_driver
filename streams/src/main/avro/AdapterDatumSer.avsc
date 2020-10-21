@@ -2,7 +2,10 @@
   "type": "record",
   "name": "AdapterDatumSer",
   "fields": [
-    {"name": "machine_id", "type": "string"},
+    {"name": "machine_id",     "type": "string"},
+    {"name": "offset",         "type": "long"},
+    {"name": "timestamp",      "type": "long"},
+    {"name": "partition",      "type": "int"},
     {"name": "max_axis",       "default": null, "type": ["null", "int"]},
     {"name": "addinfo",        "default": null, "type": ["null", "int"]},
     {"name": "cnc_type",       "default": null, "type": ["null", "string"]},
