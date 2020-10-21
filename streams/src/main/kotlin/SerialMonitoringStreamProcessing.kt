@@ -38,7 +38,7 @@ val gson = Gson()
 fun main() {
 
     val logger = LoggerFactory.getLogger("streams")
-    val schemaRegistryUrl = "http://localhost:8081"
+    val schemaRegistryUrl = System.getenv("SCHEMA_REGISTRY_URL") ?: "http://localhost:8081"
 
     val props = Properties()
     props[StreamsConfig.APPLICATION_ID_CONFIG] = System.getenv("STREAMS_APPLICATION_ID") ?: "alt-streams-monitoring"

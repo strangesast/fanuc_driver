@@ -36,6 +36,14 @@ services:
       - POSTGRES_DB=testing
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
+  streams:
+    build:
+      context: .
+      dockerfile: docker/streams/Dockerfile
+    environment:
+      - KAFKA_HOSTS=kafka:29092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - STREAMS_APPLICATION_ID=alt-streams-monitoring
   connect:
     image: strangesast/fanuc_driver-connect
     build:

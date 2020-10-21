@@ -2,7 +2,7 @@
 from gradle as build
 
 workdir /home/gradle/src
-copy --chown=gradle:gradle . /home/gradle/src
+copy --chown=gradle:gradle streams/ /home/gradle/src
 run gradle build --no-daemon
 
 
