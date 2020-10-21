@@ -11,8 +11,10 @@ key.converter.schemas.enable=true
 value.converter.schemas.enable=true
 
 offset.storage.file.filename=/tmp/connect.offsets
-offset.flush.interval.ms=$FLUSH_INTERVAL
-#offset.flush.interval.ms=1000
+#offset.flush.interval.ms=$FLUSH_INTERVAL
+offset.flush.interval.ms=1000
 max.poll.interval.ms=600000
+heartbeat.interval.ms=10000
+session.timeout.ms=250000
 
 plugin.path=/usr/share/java,/usr/share/confluent-hub-components,/etc/kafka-connect/jars/

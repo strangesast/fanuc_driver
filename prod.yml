@@ -31,14 +31,13 @@ services:
       - "5433:5432"
     volumes:
 #      - ./sql/:/docker-entrypoint-initdb.d/
-      - db_data:/var/lib/postgresql/data
+      - fanuc_driver_db_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=testing
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
   connect:
     image: strangesast/fanuc_driver-connect
-    network_mode: host
     build:
       context: .
       dockerfile: docker/connect/Dockerfile
@@ -49,7 +48,6 @@ services:
       - FLUSH_INTERVAL=1000
   schema-registry:
     image: confluentinc/cp-schema-registry:6.0.0
-    network_mode: host
     ports:
       - "8081:8081"
     environment:
@@ -63,7 +61,7 @@ services:
       - DEVICE_IP=10.0.0.200
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/driver/Dockerfile
   driver1:
     image: strangesast/fanuc_driver
     restart: unless-stopped
@@ -72,7 +70,7 @@ services:
       - DEVICE_IP=10.0.0.207
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/driver/Dockerfile
   driver2:
     image: strangesast/fanuc_driver
     restart: unless-stopped
@@ -81,7 +79,7 @@ services:
       - DEVICE_IP=10.0.0.208
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/driver/Dockerfile
   driver3:
     image: strangesast/fanuc_driver
     restart: unless-stopped
@@ -90,7 +88,7 @@ services:
       - DEVICE_IP=10.0.0.209
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/driver/Dockerfile
   driver4:
     image: strangesast/fanuc_driver
     restart: unless-stopped
@@ -99,7 +97,7 @@ services:
       - DEVICE_IP=10.0.0.206
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/driver/Dockerfile
   driver5:
     image: strangesast/fanuc_driver
     restart: unless-stopped
@@ -108,15 +106,13 @@ services:
       - DEVICE_IP=10.0.0.112
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/driver/Dockerfile
 volumes:
-  db_data:
+  fanuc_driver_db_data:
     external: true
   kafka_data:
     external: true
   zookeeper_log:
     external: true
   zookeeper_data:
-    external: true
-  db_data:
     external: true
