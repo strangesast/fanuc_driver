@@ -183,7 +183,6 @@ for msg in consumer:
     #pkey_distribution.send(p)
     execution_changes.send(p)
     #execution_counts.send(p)
-
     #value_key_distribution.send(p)
     #meta_averages.send(p)
 

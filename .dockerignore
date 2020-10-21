@@ -1,4 +1,5 @@
 .git*
-build/
+adapter/build/
 docker-compose.yml
-Dockerfile
+docker/
+monitor/env/
