@@ -34,7 +34,7 @@ def check_pkey_distribution():
 
 def check_value_key_distribution():
     total = 0
-    d = defaultdict(int)
+    d = defaultdict(lambda: (0, None))
     i = 0
     while True:
         msg, v = yield
@@ -45,13 +45,16 @@ def check_value_key_distribution():
         if len(keys):
             for key in keys:
                 total += 1
-                d[key] += 1
+                cnt, _ = d[key]
+                d[key] = (cnt + 1, values[key])
         else:
-            d[None] += 1
+            cnt, _ = d[None]
+            d[None] = (cnt + 1, None)
     
         if (i & (i - 1)) == 0:
             print(i, total)
-            pprint(sorted([tuple(p) for p in d.items()], key=lambda x: x[1]))
+            for key, (cnt, ex) in sorted([tuple(p) for p in d.items()], key=lambda x: x[1][0]):
+                print(f'{str(key).ljust(14)} {str(cnt).ljust(8)} {repr(ex)}')
 
         i += 1
 
@@ -93,6 +96,44 @@ def check_execution_changes():
                     b = b or ''
                     print(f'{k} {a.rjust(12)} -> {b.ljust(12)} at {t}')
 
+
+def check_execution_counts():
+    d = {}
+    dd = defaultdict(lambda: (0, 0.0))
+    i = 0
+    while True:
+        msg, v = yield
+
+        values, meta = v['values'], v['meta']
+        ts, k = msg.timestamp, msg.key
+
+        if (next_exec := values.get('execution')) is not None:
+            aa = d.get(k)
+            if aa is None:
+                d[k] = (None, (next_exec, ts))
+                continue
+
+            a, (last_exec, last_ts) = aa
+
+            if last_exec == next_exec:
+                d[k] = (a, (next_exec, ts))
+            else:
+                cnt, total = dd[last_exec]
+                dd[last_exec] = (cnt + 1, total + (ts - last_ts))
+                d[k] = ((last_exec, last_ts), (next_exec, ts))
+
+                for key, (cnt, total) in sorted([tuple(p) for p in dd.items()], key=lambda x: x[1][0]):
+                    avg = total / cnt
+                    print(f'{str(key).ljust(14)} {str(cnt).ljust(8)} {avg:.2f}')
+                print()
+
+            if (i & (i - 1)) == 0:
+                pass
+                #pprint(sorted([(k, t / n) for k, (n, t) in d.items()], key=lambda x: x[1]))
+    
+            i += 1
+
+
 def check():
     d = {}
     while True:
@@ -124,6 +165,9 @@ next(value_key_distribution)
 execution_changes = check_execution_changes()
 next(execution_changes)
 
+execution_counts = check_execution_counts()
+next(execution_counts)
+
 meta_averages = check_meta_averages()
 next(meta_averages)
 
@@ -136,9 +180,10 @@ for msg in consumer:
 
     p = (msg, v)
 
-    pkey_distribution.send(p)
-    #execution_changes.send(p)
+    #pkey_distribution.send(p)
+    execution_changes.send(p)
+    #execution_counts.send(p)
 
-    value_key_distribution.send(p)
+    #value_key_distribution.send(p)
     #meta_averages.send(p)
 
