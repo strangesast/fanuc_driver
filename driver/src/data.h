@@ -96,15 +96,26 @@ typedef struct MachineProgram {
   char header[2048];
 } MachineProgram;
 
+typedef struct MachineProgramName {
+  unsigned long executionDuration;
+  long number;
+  char name[36];
+  char path[256];
+} MachineProgramName;
+
 typedef struct MachineBlock {
   unsigned long executionDuration;
   char block[2048];
+  long prgNum;
+  long blkNum;
 } MachineBlock;
 
 int getMachineInfo(MachineInfo *v);
+int getMachineProgramName(MachineProgramName *v);
 int getMachineMessage(MachineMessage *v);
 int getMachineStatus(MachineStatus *v);
 int getMachinePartCount(MachinePartCount *v);
+int getMachineCycleTime(MachineCycleTime *v);
 int getMachineDynamic(MachineDynamic *v);
 int getMachineToolInfo(MachineToolInfo *v);
 int getMachineProgram(MachineProgram *v, short programNum);

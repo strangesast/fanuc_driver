@@ -19,5 +19,5 @@ run mkdir build && \
 
 from base
 
-copy --from=builder /usr/src/app/build/fanuc_driver /usr/local/bin
+copy --from=builder /usr/src/app/build/fanuc_* /usr/local/bin/
 cmd ["fanuc_driver"]

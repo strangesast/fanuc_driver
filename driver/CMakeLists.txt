@@ -6,12 +6,14 @@ project(FanucDriver LANGUAGES C VERSION 0.1)
 
 add_executable(fanuc_driver src/main.c src/data.c ../external/cJSON/cJSON.c)
 
+add_executable(fanuc_debug src/debug.c src/data.c ../external/cJSON/cJSON.c)
+
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
-  #  target_compile_options(fanuc_driver PRIVATE -pthread)
-  #  set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-pthread")
 else()
   target_compile_options(fanuc_driver PRIVATE -pthread -m32)
   set_target_properties(fanuc_driver PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
+  target_compile_options(fanuc_debug PRIVATE -pthread -m32)
+  set_target_properties(fanuc_debug PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
 endif()
 
 #add_library(cjson STATIC ./external/cJSON/cJSON.c)
@@ -30,7 +32,9 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_SOURCE_DIR}/external/fwlib/libfwlib32-linux-x86
 # add rdkafka here
 # add cjson here
 target_link_libraries(fanuc_driver rt m fwlib32 pthread rdkafka)
+target_link_libraries(fanuc_debug rt m fwlib32 pthread)
 
 #set(cmake_install_rpath "${CMAKE_INSTALL_PREFIX}/fwlib")
 
 install (TARGETS fanuc_driver DESTINATION /usr/local/bin)
+install (TARGETS fanuc_debug DESTINATION /usr/local/bin)

@@ -3,6 +3,7 @@ package main
 import AdapterDatum
 import AdapterDatumSer
 import ExecutionDatum
+import PartCountDatum
 import com.google.gson.Gson
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -11,8 +12,6 @@ import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.KafkaStreams
 import org.apache.kafka.streams.StreamsBuilder
 import org.apache.kafka.streams.StreamsConfig
-import org.apache.kafka.streams.kstream.Consumed
-import org.apache.kafka.streams.kstream.Produced
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.CountDownLatch
@@ -20,9 +19,9 @@ import kotlin.system.exitProcess
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
 import org.apache.avro.Schema
 import org.apache.kafka.streams.KeyValue
-import org.apache.kafka.streams.kstream.Transformer
-import org.apache.kafka.streams.kstream.TransformerSupplier
+import org.apache.kafka.streams.kstream.*
 import org.apache.kafka.streams.processor.ProcessorContext
+import java.text.SimpleDateFormat
 
 val FIELDS = listOf(
     "max_axis", "addinfo", "cnc_type", "mt_type", "series", "version",
@@ -41,7 +40,7 @@ fun main() {
     val schemaRegistryUrl = System.getenv("SCHEMA_REGISTRY_URL") ?: "http://localhost:8081"
 
     val props = Properties()
-    props[StreamsConfig.APPLICATION_ID_CONFIG] = System.getenv("STREAMS_APPLICATION_ID") ?: "alt-streams-monitoring"
+    props[StreamsConfig.APPLICATION_ID_CONFIG] = System.getenv("STREAMS_APPLICATION_ID") ?: "alt-alt-streams-monitoring"
     props[StreamsConfig.BOOTSTRAP_SERVERS_CONFIG] = System.getenv("KAFKA_HOSTS") ?: "localhost:9092"
     props[StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG] = Serdes.String().javaClass
     props[StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG] = Serdes.String().javaClass
@@ -66,6 +65,9 @@ fun main() {
     val executionDatumSerde: Serde<ExecutionDatum> = SpecificAvroSerde()
     executionDatumSerde.configure(serdeConfig, false)
 
+    val partCountDatumSerde: Serde<PartCountDatum> = SpecificAvroSerde()
+    partCountDatumSerde.configure(serdeConfig, false)
+
     val input = builder
         .stream("input", Consumed.with(Serdes.String(), Serdes.String()))
 
@@ -73,8 +75,42 @@ fun main() {
         .mapValues { str -> gson.fromJson(str, AdapterDatum::class.java) }
         .transform(TransformerSupplier { AdapterDatumTransformer() })
 
-    vals.to("input-avro", Produced.with(Serdes.String(), adapterDatumSerde))
+    /*
+    val format = SimpleDateFormat("yyyy.MM.dd HH:mm")
+    vals
+        .mapValues { value ->
+            value.getOffset()
+        }
+        .filter { _, i ->
+            (i and (i - 1)) == 0L
+        }
+        .foreach { _, i ->
+            println("at $i")
+        }
 
+    vals
+        .filter { _, value -> value.partCount != null }
+        .mapValues { value -> PartCountDatum.newBuilder().setPartCount(value.partCount).setTimestamp(value.getTimestamp()).build() }
+        .groupByKey(Grouped.with(Serdes.String(), partCountDatumSerde))
+        .aggregate(
+            { PartCountDatum() },
+            { key, value, agg ->
+                if (value.partCount != agg.partCount) {
+                    value
+                } else {
+                    agg
+                }
+            },
+            Materialized.with(Serdes.String(), partCountDatumSerde)
+        )
+        .toStream()
+        .foreach { key, value ->
+            val d = Date(value.getTimestamp())
+            println("$key ${format.format(d)} ${value.partCount}")
+        }
+    */
+
+    vals.to("input-avro", Produced.with(Serdes.String(), adapterDatumSerde))
     vals
         .filterNot { _, value -> value.getExecution().isNullOrEmpty() }
         .mapValues { value ->
@@ -87,16 +123,6 @@ fun main() {
                 .build()
         }
         .to("execution", Produced.with(Serdes.String(), executionDatumSerde))
-    /*
-    input.map { key, str ->
-        val d = gson.fromJson(str, AdapterDatum::class.java)
-        KeyValue(key, convertAdapterDatum(key, d))
-    }
-    */
-
-    // t.foreach { key, value ->
-    //     logger.info("key=$key value=${value.toString()}")
-    // }
 
     val topology = builder.build()
     logger.info(topology.describe().toString())
@@ -109,6 +135,7 @@ fun main() {
             latch.countDown()
         }
     })
+    println("starting...")
 
     try {
         streams.start()

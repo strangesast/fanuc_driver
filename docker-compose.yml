@@ -115,7 +115,6 @@ services:
   jupyter:
     image: jupyter/datascience-notebook
     network_mode: host
-    restart: always
     ports:
       - "8888:8888"
     environment:

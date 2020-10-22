@@ -108,6 +108,36 @@ int getMachineInfo(MachineInfo *v) {
   return 0;
 }
 
+int getMachineProgramName(MachineProgramName *v) {
+  struct timespec t0, t1;
+  unsigned long tt;
+  ODBEXEPRG exeprg;
+  char path[256] = "";
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+  if (cnc_exeprgname(libh, &exeprg) != EW_OK) {
+    fprintf(stderr, "Failed to read executing program name (exeprgname).\n");
+    return 1;
+  }
+
+  if (cnc_exeprgname2(libh, path) != EW_OK) {
+    fprintf(stderr, "Failed to read executing program path (exeprgname2).\n");
+    return 1;
+  }
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
+  v->executionDuration = tt;
+  v->number = exeprg.o_num;
+  memset(v->name, 0, 36);
+  strncpy(v->name, exeprg.name, 36 - 1);
+
+  memset(v->path, 0, 256);
+  strncpy(v->path, path, 256 - 1);
+
+  return 0;
+}
+
 int getMachineMessage(MachineMessage *v) {
   struct timespec t0, t1;
   unsigned long tt;
@@ -339,7 +369,13 @@ int getMachineProgram(MachineProgram *v, short programNum) {
         }
       }
     } while (ret == EW_BUFFER);
-  } else if (ret == EW_DATA) {
+  }
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
+  v->executionDuration = tt;
+
+  if (ret == EW_DATA) {
     v->number = programNum;
     sprintf(v->header, "(ERR: program %d not found on cnc)", programNum);
     fprintf(stderr, "Failed to initiate program read: %d\n", ret);
@@ -348,14 +384,12 @@ int getMachineProgram(MachineProgram *v, short programNum) {
     fprintf(stderr, "Failed to get program %d: %d\n", programNum, ret);
   }
 
-  if (cnc_upend3(libh) != EW_OK) {
-    fprintf(stderr, "Failed to close header read!\n");
-    return 1;
+  ret = cnc_upend3(libh);
+  if (ret != EW_OK) {
+    fprintf(stderr, "Failed to close header read: %d!\n", ret);
+    sprintf(v->header, "(ERR: program %d cannot be read from cnc)", programNum);
+    return 0;
   }
-  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
-
-  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
-  v->executionDuration = tt;
 
   v->number = programNum;
   sprintf(v->header, "%s", program);
@@ -364,19 +398,40 @@ int getMachineProgram(MachineProgram *v, short programNum) {
 
 int getMachineBlock(MachineBlock *v) {
   short ret;
-  struct timespec t0, t1;
-  unsigned long tt;
-  char buf[1024];
-  unsigned short len = sizeof(buf);
+  char buf[2048] = "";
   short num;
+  unsigned short len = sizeof(buf);
+  unsigned long tt;
+  struct timespec t0, t1;
+  // ODBMDIP mdip;
+  long prog_no;
+  long blk_no;
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
 
-  ret = cnc_rdexecprog(libh, (unsigned short *)&len, &num, buf);
+  // ret = cnc_rdexecprog(libh, (unsigned short *)&len, &num, buf);
+  ret = cnc_rdexecprog(libh, &len, &num, buf);
   if (ret != EW_OK) {
     fprintf(stderr, "Failed read exec prog: %d!\n", ret);
     return 1;
   }
+  ret = cnc_rdactpt(libh, &prog_no, &blk_no);
+  /*
+  ret = cnc_rdexecpt(libh, PRGPNT *pact, PRGPNT *pnext);
+  ret = cnc_rdmdipntr(libh, &mdip);
+  */
+  if (ret == EW_MODE) {
+    v->blkNum = -1;
+    v->prgNum = -1;
+  } else if (ret == EW_OK) {
+    v->blkNum = blk_no;
+    v->prgNum = prog_no;
+  } else {
+    fprintf(stderr, "Failed read exec blk num: %d!\n", ret);
+    return 1;
+  }
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+
   buf[len] = '\0';
   for (int i = 0; i < len; i++) {
     if (buf[i] == '\n') {
@@ -385,13 +440,10 @@ int getMachineBlock(MachineBlock *v) {
     }
   }
 
-  strncpy(v->block, buf, len);
-
-  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  strncpy(v->block, buf, len - 1);
 
   tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
-
   return 0;
 }
 

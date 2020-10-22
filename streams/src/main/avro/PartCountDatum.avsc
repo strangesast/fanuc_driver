@@ -1,0 +1,8 @@
+{
+  "type": "record",
+  "name": "PartCountDatum",
+  "fields": [
+    {"name": "part_count", "type": "long"},
+    {"name": "timestamp",  "type": "long"}
+  ]
+}
