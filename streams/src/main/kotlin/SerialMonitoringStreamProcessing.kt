@@ -228,13 +228,22 @@ fun convertAdapterDatum(
     if (!_in.getLoad().isNullOrEmpty()) {
         out.load = gson.toJson(_in.getLoad())
     }
+    out.blockNum = _in.blockNum
+    out.cycleTime = _in.cycleTime
+    out.programNumberAlt = _in.programNumberAlt
+    out.programNameAlt = _in.programNameAlt
+    out.programPathAlt = _in.programPathAlt
 
-    out.metaPartCount = _meta.getOrDefault("part_count", -1)
-    out.metaStatus = _meta.getOrDefault("status", -1)
-    out.metaTool = _meta.getOrDefault("tool", -1)
-    out.metaDynamic = _meta.getOrDefault("dynamic", -1)
-    out.metaMessage = _meta.getOrDefault("message", -1)
-    out.metaBlock = _meta.getOrDefault("block", -1)
-    out.metaTotal = _meta.getOrDefault("total", -1)
+    out.metaInfo = _meta.get("info")
+    out.metaPartCount = _meta.get("part_count")
+    out.metaStatus = _meta.get("status")
+    out.metaTool = _meta.get("tool")
+    out.metaDynamic = _meta.get("dynamic")
+    out.metaMessage = _meta.get("message")
+    out.metaProgramName = _meta.get("program_name")
+    out.metaProgram = _meta.get("program")
+    out.metaBlock = _meta.get("block")
+    out.metaTotal = _meta.get("total")
+
     return out.build()
 }
