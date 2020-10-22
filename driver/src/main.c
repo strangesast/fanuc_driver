@@ -24,7 +24,7 @@ char machineName[MAXLEN];
 short programNum = 0;
 long partCount = -1;
 int devicePort = 8193;
-const double minimum_interval = 0.5;
+const long minimum_interval = (1.5) * 1e6;
 char *brokers = "localhost:9092"; /* Argument: broker list */
 char *topic = "input";            /* Argument: topic to produce to */
 
@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
     rd_kafka_poll(rk, 0 /*non-blocking*/);
 
     if (tt < minimum_interval) {
-      usleep((long)((minimum_interval - tt) * 1e6));
+      usleep(minimum_interval - tt);
     }
 
     free(serialized);
