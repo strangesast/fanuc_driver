@@ -1,0 +1,26 @@
+version: '3.7'
+services:
+  pgadmin:
+    image: dpage/pgadmin4
+    network_mode: host
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin
+      - PGADMIN_DEFAULT_PASSWORD=PasswordPassword123123
+      - PGADMIN_LISTEN_PORT=8090
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+  jupyter:
+    image: jupyter/datascience-notebook
+    network_mode: host
+    ports:
+      - "8888:8888"
+    environment:
+      - NB_USER=user
+      - PASSWORD=PasswordPassword123123
+    volumes:
+      - jupyter_data:/home/user/work
+
+volumes:
+  pgadmin_data:
+  jupyter_data:
+    external: true

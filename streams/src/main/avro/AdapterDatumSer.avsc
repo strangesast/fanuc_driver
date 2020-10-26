@@ -1,5 +1,6 @@
 {
   "type": "record",
+  "namespace": "strangesast",
   "name": "AdapterDatumSer",
   "fields": [
     {"name": "machine_id",         "type": "string"},
@@ -47,9 +48,10 @@
     {"name": "load",               "default": null, "type": ["null", "string"]},
     {"name": "block_num",          "default": null, "type": ["null", "long"]},
     {"name": "cycle_time",         "default": null, "type": ["null", "long"]},
-    {"name": "program_number_alt", "default": null, "type": ["null", "long"]},
-    {"name": "program_name_alt",   "default": null, "type": ["null", "string"]},
-    {"name": "program_path_alt",   "default": null, "type": ["null", "string"]},
+    {"name": "program_name",       "default": null, "type": ["null", "string"]},
+    {"name": "program_path",       "default": null, "type": ["null", "string"]},
+    {"name": "program",            "default": null, "type": ["null", "string"]},
+    {"name": "program_size",       "default": null, "type": ["null", "long"]},
     {"name": "meta_info",          "default": null, "type": ["null", "long"]},
     {"name": "meta_part_count",    "default": null, "type": ["null", "long"]},
     {"name": "meta_cycle_time",    "default": null, "type": ["null", "long"]},
@@ -59,6 +61,7 @@
     {"name": "meta_message",       "default": null, "type": ["null", "long"]},
     {"name": "meta_program_name",  "default": null, "type": ["null", "long"]},
     {"name": "meta_program",       "default": null, "type": ["null", "long"]},
+    {"name": "meta_program_header","default": null, "type": ["null", "long"]},
     {"name": "meta_block",         "default": null, "type": ["null", "long"]},
     {"name": "meta_total",         "default": null, "type": ["null", "long"]}
   ]

@@ -1,9 +1,5 @@
 package main
 
-import AdapterDatum
-import AdapterDatumSer
-import ExecutionDatum
-import PartCountDatum
 import com.google.gson.Gson
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -22,6 +18,8 @@ import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.*
 import org.apache.kafka.streams.processor.ProcessorContext
 import java.text.SimpleDateFormat
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 val FIELDS = listOf(
     "max_axis", "addinfo", "cnc_type", "mt_type", "series", "version",
@@ -59,24 +57,59 @@ fun main() {
         schemaRegistryUrl
     )
 
-    val adapterDatumSerde: Serde<AdapterDatumSer> = SpecificAvroSerde()
+    val adapterDatumSerde: Serde<strangesast.AdapterDatum> = SpecificAvroSerde()
     adapterDatumSerde.configure(serdeConfig, false)
 
-    val executionDatumSerde: Serde<ExecutionDatum> = SpecificAvroSerde()
+    val adapterDatumSerSerde: Serde<strangesast.AdapterDatumSer> = SpecificAvroSerde()
+    adapterDatumSerSerde.configure(serdeConfig, false)
+
+    val executionDatumSerde: Serde<strangesast.ExecutionDatum> = SpecificAvroSerde()
     executionDatumSerde.configure(serdeConfig, false)
 
-    val partCountDatumSerde: Serde<PartCountDatum> = SpecificAvroSerde()
+    val partCountDatumSerde: Serde<strangesast.PartCountDatum> = SpecificAvroSerde()
     partCountDatumSerde.configure(serdeConfig, false)
 
     val input = builder
         .stream("input", Consumed.with(Serdes.String(), Serdes.String()))
+        .mapValues { str -> gson.fromJson(str, strangesast.AdapterDatum::class.java) }
 
     val vals = input
-        .mapValues { str -> gson.fromJson(str, AdapterDatum::class.java) }
         .transform(TransformerSupplier { AdapterDatumTransformer() })
 
-    /*
+    val sessionWindow = SessionWindows.with(Duration.ofMinutes(30))
+
     val format = SimpleDateFormat("yyyy.MM.dd HH:mm")
+
+    /*
+    vals
+        .groupByKey(Grouped.with(Serdes.String(), adapterDatumSerSerde))
+        .windowedBy(sessionWindow)
+        .count()
+        .toStream()
+        .map { key, count ->
+            val w = key.window()
+            val machine_id = key.key()
+            val start = w.start()
+            val end = w.end()
+            KeyValue(Pair(machine_id, start), mapOf("machine_id" to machine_id, "start" to start, "end" to end, "count" to count))
+        }
+
+    val windows = TimeWindows.of( Duration.ofMinutes(5)).advanceBy(Duration.ofMinutes(1))
+    */
+
+
+    /*
+    input
+        .groupByKey(Grouped.with(Serdes.String(), adapterDatumSerde))
+        .windowedBy(windows)
+        .count()
+        .toStream()
+        .foreach { key, value ->
+            println("key: ${key.key()}, window: ${format.format(Date.from(key.window().startTime()))}, $value")
+        }
+    */
+
+    /*
     vals
         .mapValues { value ->
             value.getOffset()
@@ -87,7 +120,9 @@ fun main() {
         .foreach { _, i ->
             println("at $i")
         }
+    */
 
+    /*
     vals
         .filter { _, value -> value.partCount != null }
         .mapValues { value -> PartCountDatum.newBuilder().setPartCount(value.partCount).setTimestamp(value.getTimestamp()).build() }
@@ -110,11 +145,11 @@ fun main() {
         }
     */
 
-    vals.to("input-avro", Produced.with(Serdes.String(), adapterDatumSerde))
+    vals.to("input-avro", Produced.with(Serdes.String(), adapterDatumSerSerde))
     vals
         .filterNot { _, value -> value.getExecution().isNullOrEmpty() }
         .mapValues { value ->
-            ExecutionDatum.newBuilder()
+            strangesast.ExecutionDatum.newBuilder()
                 .setMachineId(value.machineId)
                 .setExecution(value.getExecution())
                 .setTimestamp(value.getTimestamp())
@@ -146,14 +181,14 @@ fun main() {
     exitProcess(0)
 }
 
-class AdapterDatumTransformer : Transformer<String, AdapterDatum, KeyValue<String, AdapterDatumSer>> {
+class AdapterDatumTransformer : Transformer<String, strangesast.AdapterDatum, KeyValue<String, strangesast.AdapterDatumSer>> {
     private lateinit var context: ProcessorContext
 
     override fun init(context: ProcessorContext) {
         this.context = context
     }
 
-    override fun transform(key: String, value: AdapterDatum): KeyValue<String, AdapterDatumSer> {
+    override fun transform(key: String, value: strangesast.AdapterDatum): KeyValue<String, strangesast.AdapterDatumSer> {
         val offset = context.offset()
         val timestamp = context.timestamp()
         val partition = context.partition()
@@ -166,12 +201,12 @@ class AdapterDatumTransformer : Transformer<String, AdapterDatum, KeyValue<Strin
 
 fun convertAdapterDatum(
     machineID: String,
-    datum: AdapterDatum,
+    datum: strangesast.AdapterDatum,
     offset: Long,
     timestamp: Long,
     partition: Int
-): AdapterDatumSer {
-    val out = AdapterDatumSer.newBuilder()
+): strangesast.AdapterDatumSer {
+    val out = strangesast.AdapterDatumSer.newBuilder()
     out.machineId = machineID
     out.offset = offset
     out.timestamp = timestamp
@@ -230,9 +265,10 @@ fun convertAdapterDatum(
     }
     out.blockNum = _in.blockNum
     out.cycleTime = _in.cycleTime
-    out.programNumberAlt = _in.programNumberAlt
-    out.programNameAlt = _in.programNameAlt
-    out.programPathAlt = _in.programPathAlt
+    out.programName = _in.programName
+    out.programPath = _in.programPath
+    out.program = _in.program
+    out.programSize = _in.programSize
 
     out.metaInfo = _meta.get("info")
     out.metaPartCount = _meta.get("part_count")
@@ -241,6 +277,7 @@ fun convertAdapterDatum(
     out.metaDynamic = _meta.get("dynamic")
     out.metaMessage = _meta.get("message")
     out.metaProgramName = _meta.get("program_name")
+    out.metaProgramHeader = _meta.get("program_header")
     out.metaProgram = _meta.get("program")
     out.metaBlock = _meta.get("block")
     out.metaTotal = _meta.get("total")

@@ -1,5 +1,6 @@
 {
   "type": "record",
+  "namespace": "strangesast",
   "name": "ExecutionDatum",
   "fields": [
     {"name": "machine_id", "type": "string"},
