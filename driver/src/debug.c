@@ -21,32 +21,43 @@ short mProgramNum = -1;
 char mProgramPath[256] = "";
 long partCount = -1;
 
-int main() {
+int main(int argc, char **argv) {
   char deviceIP[MAXPATH] = "127.0.0.1";
   int devicePort = 8193;
   struct timespec t0, t1;
   unsigned long tt;
   cJSON *updates, *meta;
 
-  signal(SIGINT, intHandler);
-  signal(SIGTERM, intHandler);
-  updates = cJSON_CreateObject();
-  meta = cJSON_CreateObject();
+  if (argc > 1) {
+    strncpy(deviceIP, argv[1], 255);
+    deviceIP[255] = '\0';
+  }
 
-  strcpy(deviceIP, "127.0.0.1");
-  devicePort = 8193;
+  if (argc > 2) {
+    int tmp;
+    tmp = atoi(argv[2]);
+    if (tmp > 0 && tmp < 65535) {
+      devicePort = tmp;
+    }
+  }
 
   if (setupConnection(deviceIP, devicePort)) {
     fprintf(stderr, "failed to setup machine connection!\n");
     exit(EXIT_FAILURE);
     return 1;
-  };
+  }
+
+  updates = cJSON_CreateObject();
+  meta = cJSON_CreateObject();
 
   if (checkMachineInfo(updates, meta)) {
     fprintf(stderr, "failed to read machine info!\n");
     exit(EXIT_FAILURE);
     return 1;
   }
+
+  signal(SIGINT, intHandler);
+  signal(SIGTERM, intHandler);
 
   do {
     clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
