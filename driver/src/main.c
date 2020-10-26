@@ -21,12 +21,16 @@ short unsigned int fLibHandle;
 char deviceIP[MAXPATH] = "127.0.0.1";
 char deviceID[MAXLEN];
 char machineName[MAXLEN];
-short programNum = 0;
-long partCount = -1;
 int devicePort = 8193;
 const long minimum_interval = (1.5) * 1e6;
 char *brokers = "localhost:9092"; /* Argument: broker list */
 char *topic = "input";            /* Argument: topic to produce to */
+
+// shared
+short cProgramNum = -1;
+short mProgramNum = -1;
+char mProgramPath[256] = "";
+long partCount = -1;
 
 static volatile int runningCondition = 0;
 
@@ -89,7 +93,9 @@ int loop_tick(cJSON *updates, cJSON *meta) {
       checkMachineDynamic(updates, meta) ||
       checkMachineMessage(updates, meta) ||
       checkMachineProgramName(updates, meta) ||
-      checkMachineProgram(updates, meta) || checkMachineBlock(updates, meta)) {
+      checkMachineProgramHeader(updates, meta) ||
+      checkMachineProgramContents(updates, meta) ||
+      checkMachineBlock(updates, meta)) {
     fprintf(stderr, "failed to check machine values\n");
     return 1;
   }

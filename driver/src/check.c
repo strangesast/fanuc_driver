@@ -9,7 +9,9 @@
 
 extern char deviceIP[MAXPATH];
 extern char deviceID[MAXLEN];
-extern short programNum;
+extern short cProgramNum;
+extern short mProgramNum;
+extern char mProgramPath[256];
 extern long partCount;
 
 int checkMachineInfo(cJSON *updates, cJSON *meta) {
@@ -190,38 +192,32 @@ int checkMachineCycleTime(cJSON *updates, cJSON *meta) {
 }
 
 int checkMachineProgramName(cJSON *updates, cJSON *meta) {
-  static MachineProgramName *lv = NULL;
+  static short lastCProgramNum = -1;
 
-  MachineProgramName *v = malloc(sizeof *v);
+  if (lastCProgramNum != cProgramNum) {
+    MachineProgramName *v = malloc(sizeof *v);
 
-  if (getMachineProgramName(v)) {
-    free(v);
-    fprintf(stderr, "failed to read machine program name\n");
-    return 1;
-  }
+    if (getMachineProgramName(v)) {
+      free(v);
+      fprintf(stderr, "failed to read machine program name\n");
+      return 1;
+    }
+    strncpy(mProgramPath, v->path, 256);
 
-  if (lv == NULL || lv->number != v->number) {
-    cJSON *program_number_datum = cJSON_CreateNumber(v->number);
-    cJSON_AddItemToObject(updates, "program_number_alt", program_number_datum);
-  }
-  if (lv == NULL || strncmp(lv->name, v->name, 36) != 0) {
     cJSON *program_name_datum;
     program_name_datum = cJSON_CreateString(v->name);
-    cJSON_AddItemToObject(updates, "program_name_alt", program_name_datum);
-  }
-  if (lv == NULL || strncmp(lv->path, v->path, 256) != 0) {
+    cJSON_AddItemToObject(updates, "program_name", program_name_datum);
+
     cJSON *program_path_datum;
     program_path_datum = cJSON_CreateString(v->path);
-    cJSON_AddItemToObject(updates, "program_path_alt", program_path_datum);
-  }
+    cJSON_AddItemToObject(updates, "program_path", program_path_datum);
 
-  cJSON *ed_meta_datum = cJSON_CreateNumber(v->executionDuration);
-  cJSON_AddItemToObject(meta, "program_name", ed_meta_datum);
+    cJSON *ed_meta_datum = cJSON_CreateNumber(v->executionDuration);
+    cJSON_AddItemToObject(meta, "program_name", ed_meta_datum);
 
-  if (lv != NULL) {
-    free(lv);
+    free(v);
+    lastCProgramNum = cProgramNum;
   }
-  lv = v;
 
   return 0;
 }
@@ -402,12 +398,13 @@ int checkMachineDynamic(cJSON *updates, cJSON *meta) {
   }
   // current program
   if (lv == NULL || lv->cprogram != v->cprogram) {
-    programNum = v->cprogram;
+    cProgramNum = v->cprogram;
     cJSON *cprogram_datum = cJSON_CreateNumber(v->cprogram);
     cJSON_AddItemToObject(updates, "cprogram", cprogram_datum);
   }
   // main program
   if (lv == NULL || lv->mprogram != v->mprogram) {
+    mProgramNum = v->mprogram;
     cJSON *mprogram_datum = cJSON_CreateNumber(v->mprogram);
     cJSON_AddItemToObject(updates, "mprogram", mprogram_datum);
   }
@@ -473,35 +470,56 @@ int checkMachineToolInfo(cJSON *updates, cJSON *meta) {
   return 0;
 }
 
-int checkMachineProgram(cJSON *updates, cJSON *meta) {
-  static MachineProgram *lv = NULL;
-  static short lastProgramNum = 0;
+int checkMachineProgramHeader(cJSON *updates, cJSON *meta) {
+  static short lastCProgramNum = 0;
 
-  if (lastProgramNum != programNum) {
+  if (lastCProgramNum != cProgramNum) {
     MachineProgram *v = malloc(sizeof *v);
 
-    if (getMachineProgram(v, programNum)) {
+    if (getMachineProgramHeader(v, cProgramNum)) {
       free(v);
-      fprintf(stderr, "failed to check machine program: %d\n", programNum);
+      fprintf(stderr, "failed to check machine program header: %d\n",
+              cProgramNum);
       return 1;
     }
-
-    cJSON *number_datum = cJSON_CreateNumber(v->number);
-    cJSON_AddItemToObject(updates, "program_number", number_datum);
 
     cJSON *header_datum = cJSON_CreateString(v->header);
     cJSON_AddItemToObject(updates, "program_header", header_datum);
 
     cJSON *ed_meta_datum = cJSON_CreateNumber(v->executionDuration);
-    cJSON_AddItemToObject(meta, "program", ed_meta_datum);
+    cJSON_AddItemToObject(meta, "program_header", ed_meta_datum);
 
-    if (lv != NULL) {
-      free(lv);
+    free(v);
+    lastCProgramNum = cProgramNum;
+  }
+  return 0;
+}
+
+int checkMachineProgramContents(cJSON *updates, cJSON *meta) {
+  static short lastProgramNum = -1;
+
+  if (lastProgramNum != mProgramNum) {
+    MachineProgramContents *v = malloc(sizeof *v);
+
+    if (getMachineProgramContents(v, mProgramPath)) {
+      free(v);
+      fprintf(stderr, "failed to check machine program: %s\n", mProgramPath);
+      return 1;
     }
 
-    lv = v;
-    lastProgramNum = programNum;
+    cJSON *program_size_datum = cJSON_CreateNumber(v->size);
+    cJSON_AddItemToObject(updates, "program_size", program_size_datum);
+
+    cJSON *program_datum = cJSON_CreateString(v->contents);
+    cJSON_AddItemToObject(updates, "program", program_datum);
+    free(v->contents);
+
+    cJSON *ed_meta_datum = cJSON_CreateNumber(v->executionDuration);
+    cJSON_AddItemToObject(meta, "program", ed_meta_datum);
+
+    lastProgramNum = mProgramNum;
   }
+
   return 0;
 }
 

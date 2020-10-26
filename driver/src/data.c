@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -336,7 +337,7 @@ int getMachineToolInfo(MachineToolInfo *v) {
   return 0;
 }
 
-int getMachineProgram(MachineProgram *v, short programNum) {
+int getMachineProgramHeader(MachineProgram *v, short programNum) {
   short ret;
   // max length of "header", could read entire file
   char program[2048];
@@ -380,7 +381,7 @@ int getMachineProgram(MachineProgram *v, short programNum) {
     sprintf(v->header, "(ERR: program %d not found on cnc)", programNum);
     fprintf(stderr, "Failed to initiate program read: %d\n", ret);
     return 0;
-  } else {
+  } else if (ret != EW_OK) {
     fprintf(stderr, "Failed to get program %d: %d\n", programNum, ret);
   }
 
@@ -393,6 +394,66 @@ int getMachineProgram(MachineProgram *v, short programNum) {
 
   v->number = programNum;
   sprintf(v->header, "%s", program);
+  return 0;
+}
+
+int getMachineProgramContents(MachineProgramContents *v, char *programPath) {
+  short ret;
+  short type = 0;     // NC Program
+  long chunk = 1280;  // must be multiple of 256
+  char buf[2048];
+  long len;
+  char *prog = NULL;
+  struct timespec t0, t1;
+  unsigned long tt;
+
+  long offset = 0;
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+  ret = cnc_upstart4(libh, type, programPath);
+
+  if (ret != EW_OK) {
+    fprintf(stderr, "upstart4 failed\n");
+  }
+
+  do {
+    len = chunk;
+    ret = cnc_upload4(libh, &len, buf);
+
+    if (ret == EW_BUFFER) {
+      continue;
+    }
+    if (ret == EW_OK) {
+      if (len > 0) {
+        size_t s = offset + len;
+        if (prog == NULL) {
+          prog = (char *)malloc(s + 1);
+        } else {
+          prog = (char *)realloc(prog, s + 1);
+        }
+        prog[s] = 0;
+        memcpy(&prog[offset], &buf[0], len);
+        offset += len;
+      }
+    }
+  } while (ret == EW_OK || ret == EW_BUFFER);
+
+  ret = cnc_upend4(libh);
+  if (ret != EW_OK) {
+    if (prog != NULL) {
+      free(prog);
+    }
+    fprintf(stderr, "upend4 failed!\n");
+    return 1;
+  }
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+  tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
+
+  v->executionDuration = tt;
+  v->size = offset + 1;
+  v->contents = prog;
+
   return 0;
 }
 

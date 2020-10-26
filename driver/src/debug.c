@@ -10,13 +10,16 @@
 #include "./check.c"
 #include "./common.h"
 
-short programNum = 0;
-long partCount = -1;
 char deviceID[MAXLEN];
-
 static volatile int runningCondition = 0;
 void intHandler(int sig) { runningCondition = 1; }
 const long minimum_interval = (1.5) * 1e6;
+
+// shared
+short cProgramNum = -1;
+short mProgramNum = -1;
+char mProgramPath[256] = "";
+long partCount = -1;
 
 int main() {
   char deviceIP[MAXPATH] = "127.0.0.1";
@@ -55,7 +58,8 @@ int main() {
         checkMachineDynamic(updates, meta) ||
         checkMachineMessage(updates, meta) ||
         checkMachineProgramName(updates, meta) ||
-        checkMachineProgram(updates, meta) ||
+        checkMachineProgramHeader(updates, meta) ||
+        checkMachineProgramContents(updates, meta) ||
         checkMachineBlock(updates, meta)) {
       fprintf(stderr, "failed to check machine values\n");
       exit(EXIT_FAILURE);
