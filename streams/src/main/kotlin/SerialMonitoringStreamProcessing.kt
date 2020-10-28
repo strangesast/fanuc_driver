@@ -47,7 +47,10 @@ fun main() {
     props[AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG] = schemaRegistryUrl
     props[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = "earliest"
     props[StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG] = 0
+    /*
     props[StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG] = "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler"
+    */
+    props[StreamsConfig.DEFAULT_TIMESTAMP_EXTRACTOR_CLASS_CONFIG] = "org.apache.kafka.streams.processor.UsePartitionTimeOnInvalidTimestamp"
 
     val builder = StreamsBuilder()
 
@@ -82,7 +85,7 @@ fun main() {
         .transform(TransformerSupplier { AdapterDatumTransformer() })
 
 
-    val format = SimpleDateFormat("yyyy.MM.dd HH:mm")
+    // val format = SimpleDateFormat("yyyy.MM.dd HH:mm")
 
     /*
     vals
@@ -293,7 +296,7 @@ fun convertAdapterDatum(
     out.cycleTime = _in.cycleTime
     out.programName = _in.programName
     out.programPath = _in.programPath
-    out.program = _in.program
+    out.program = _in.getProgram()
     out.programSize = _in.programSize
 
     out.metaInfo = _meta.get("info")
