@@ -17,6 +17,7 @@ import org.apache.avro.Schema
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.*
 import org.apache.kafka.streams.processor.ProcessorContext
+import strangesast.SampleCountDatum
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -46,6 +47,7 @@ fun main() {
     props[AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG] = schemaRegistryUrl
     props[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG] = "earliest"
     props[StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG] = 0
+    props[StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG] = "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler"
 
     val builder = StreamsBuilder()
 
@@ -69,6 +71,9 @@ fun main() {
     val partCountDatumSerde: Serde<strangesast.PartCountDatum> = SpecificAvroSerde()
     partCountDatumSerde.configure(serdeConfig, false)
 
+    val sampleCountDatumSerde: Serde<strangesast.SampleCountDatum> = SpecificAvroSerde()
+    sampleCountDatumSerde.configure(serdeConfig, false)
+
     val input = builder
         .stream("input", Consumed.with(Serdes.String(), Serdes.String()))
         .mapValues { str -> gson.fromJson(str, strangesast.AdapterDatum::class.java) }
@@ -76,7 +81,6 @@ fun main() {
     val vals = input
         .transform(TransformerSupplier { AdapterDatumTransformer() })
 
-    val sessionWindow = SessionWindows.with(Duration.ofMinutes(30))
 
     val format = SimpleDateFormat("yyyy.MM.dd HH:mm")
 
@@ -98,16 +102,36 @@ fun main() {
     */
 
 
-    /*
-    input
+    val inputGroup = input
         .groupByKey(Grouped.with(Serdes.String(), adapterDatumSerde))
-        .windowedBy(windows)
-        .count()
-        .toStream()
-        .foreach { key, value ->
-            println("key: ${key.key()}, window: ${format.format(Date.from(key.window().startTime()))}, $value")
+
+    val inputSessions = inputGroup.windowedBy(SessionWindows.with(Duration.ofMinutes(5))).count()
+
+    inputSessions.mapValues { readOnlyKey, value ->
+            SampleCountDatum.newBuilder()
+                .setCount(value)
+                .setWindowStart(readOnlyKey.window().start())
+                .setWindowEnd(readOnlyKey.window().end())
+                .setMachineId(readOnlyKey.key())
+                .build()
         }
-    */
+        .toStream()
+        .selectKey { key, _ ->  key.key()}
+        .to("counts-sessions", Produced.with(Serdes.String(), sampleCountDatumSerde))
+
+    inputGroup.windowedBy(TimeWindows.of(Duration.ofMinutes(1)).advanceBy(Duration.ofMinutes(1)))
+        .count()
+        .mapValues { readOnlyKey, value ->
+            SampleCountDatum.newBuilder()
+                .setCount(value)
+                .setWindowStart(readOnlyKey.window().start())
+                .setWindowEnd(readOnlyKey.window().end())
+                .setMachineId(readOnlyKey.key())
+                .build()
+        }
+        .toStream()
+        .selectKey { key, _ -> key.key() }
+        .to("counts", Produced.with(Serdes.String(), sampleCountDatumSerde))
 
     /*
     vals
@@ -146,7 +170,8 @@ fun main() {
     */
 
     vals.to("input-avro", Produced.with(Serdes.String(), adapterDatumSerSerde))
-    vals
+
+    val executions = vals
         .filterNot { _, value -> value.getExecution().isNullOrEmpty() }
         .mapValues { value ->
             strangesast.ExecutionDatum.newBuilder()
@@ -157,7 +182,8 @@ fun main() {
                 .setOffset(value.getOffset())
                 .build()
         }
-        .to("execution", Produced.with(Serdes.String(), executionDatumSerde))
+
+    executions.to("execution", Produced.with(Serdes.String(), executionDatumSerde))
 
     val topology = builder.build()
     logger.info(topology.describe().toString())

@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "namespace": "strangesast",
+  "name": "SampleCountDatum",
+  "fields": [
+    {"name": "machine_id", "type": "string"},
+    {"name": "count", "type": "long"},
+    {"name": "windowStart", "type": "long"},
+    {"name": "windowEnd", "type": "long"}
+  ]
+}
