@@ -95,38 +95,6 @@ fun main() {
     */
 
 
-    val inputGroup = input
-        .groupByKey(Grouped.with(Serdes.String(), adapterDatumSerde))
-
-    val inputSessions = inputGroup.windowedBy(SessionWindows.with(Duration.ofMinutes(5))).count()
-        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
-
-    inputSessions.mapValues { readOnlyKey, value ->
-            SampleCountDatum.newBuilder()
-                .setCount(value)
-                .setWindowStart(readOnlyKey.window().start())
-                .setWindowEnd(readOnlyKey.window().end())
-                .setMachineId(readOnlyKey.key())
-                .build()
-        }
-        .toStream()
-        .selectKey { key, _ ->  key.key()}
-        .to("counts-sessions", Produced.with(Serdes.String(), sampleCountDatumSerde))
-
-    inputGroup.windowedBy(TimeWindows.of(Duration.ofMinutes(1)).advanceBy(Duration.ofMinutes(1)))
-        .count()
-        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
-        .mapValues { readOnlyKey, value ->
-            SampleCountDatum.newBuilder()
-                .setCount(value)
-                .setWindowStart(readOnlyKey.window().start())
-                .setWindowEnd(readOnlyKey.window().end())
-                .setMachineId(readOnlyKey.key())
-                .build()
-        }
-        .toStream()
-        .selectKey { key, _ -> key.key() }
-        .to("counts", Produced.with(Serdes.String(), sampleCountDatumSerde))
 
     /*
     vals
