@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "namespace": "strangesast",
+  "name": "ExecutionWithSessionDatum",
+  "fields": [
+    {"name": "machine_id", "type": "string"},
+    {"name": "execution",  "type": "string"},
+    {"name": "timestamp",  "type": "long"},
+    {"name": "offset",     "type": "long"},
+    {"name": "partition",  "type": "int"},
+    {"name": "session",    "type": "long"}
+  ]
+}

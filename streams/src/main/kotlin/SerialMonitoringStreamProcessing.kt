@@ -108,7 +108,7 @@ fun main() {
     val inputGroup = input
         .groupByKey(Grouped.with(Serdes.String(), adapterDatumSerde))
 
-    val inputSessions = inputGroup.windowedBy(SessionWindows.with(Duration.ofMinutes(5))).count()
+    val inputSessions = inputGroup.windowedBy(SessionWindows.with(Duration.ofMinutes(5)).grace(Duration.ofMinutes(1))).count()
         .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
 
     inputSessions.mapValues { readOnlyKey, value ->
@@ -123,9 +123,9 @@ fun main() {
         .selectKey { key, _ ->  key.key()}
         .to("counts-sessions", Produced.with(Serdes.String(), sampleCountDatumSerde))
 
-    inputGroup.windowedBy(TimeWindows.of(Duration.ofMinutes(1)).advanceBy(Duration.ofMinutes(1)))
+    inputGroup.windowedBy(TimeWindows.of(Duration.ofMinutes(1)).advanceBy(Duration.ofMinutes(1)).grace(Duration.ofMinutes(1)))
         .count()
-        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
+        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded())) // includes grace period
         .mapValues { readOnlyKey, value ->
             SampleCountDatum.newBuilder()
                 .setCount(value)
@@ -291,6 +291,7 @@ fun convertAdapterDatum(
     out.metaProgramHeader = _meta.get("program_header")
     out.metaProgram = _meta.get("program")
     out.metaBlock = _meta.get("block")
+    out.cycleTime = _meta.get("cyle_time")
     out.metaTotal = _meta.get("total")
 
     return out.build()

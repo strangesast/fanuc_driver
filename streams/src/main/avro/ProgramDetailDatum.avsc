@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "namespace": "strangesast",
+  "name": "ProgramDetailDatum",
+  "fields": [
+    {"name": "machine_id", "type":  "string"},
+    {"name": "timestamp", "type":  "long"},
+    {"name": "offset", "type":  "long"},
+    {"name": "hash", "type": "string"},
+    {"name": "contents", "type": "string"}
+  ]
+}

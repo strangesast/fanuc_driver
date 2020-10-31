@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "namespace": "strangesast",
+  "name": "ExecutionWithDurationDatum",
+  "fields": [
+    {"name": "machine_id", "type": "string"},
+    {"name": "execution",  "type": "string"},
+    {"name": "start",      "type": "long"},
+    {"name": "end",        "type": "long"},
+    {"name": "offset",     "type": "long"},
+    {"name": "partition",  "type": "int"},
+    {"name": "duration",   "type": "long"}
+  ]
+}
