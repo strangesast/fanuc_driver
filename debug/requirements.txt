@@ -1,2 +1,4 @@
+avro==1.10.0
 kafka-python==2.0.2
+psycopg2-binary==2.8.6
 pytz==2020.1
