@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #define _BSD_SOURCE
 #define _DEFAULT_SOURCE
+#include <libconfig.h>
 #include <math.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -16,12 +17,12 @@
 #include "./check.c"
 #include "./common.h"
 
-short unsigned int fLibHandle;
-
 char deviceIP[MAXPATH] = "127.0.0.1";
 char deviceID[MAXLEN];
+char DEFAULT_CONFIG[] = "default.cfg";
 char machineName[MAXLEN];
 int devicePort = 8193;
+const char *deviceHost = "127.0.0.1";
 const long minimum_interval = (1.5) * 1e6;
 char *brokers = "localhost:9092"; /* Argument: broker list */
 char *topic = "input";            /* Argument: topic to produce to */
@@ -33,57 +34,14 @@ char mProgramPath[256] = "";
 long partCount = -1;
 
 static volatile int runningCondition = 0;
-
-int setupEnv() {
-  char *pTmp;
-  if ((pTmp = getenv("DEVICE_IP")) != NULL) {
-    sprintf(deviceIP, "%s", pTmp);
-  }
-
-  if ((pTmp = getenv("DEVICE_PORT")) != NULL) {
-    char dp[10];
-    char *ptr;
-    memset(dp, '\0', 10);
-    strncpy(dp, pTmp, 10 - 1);
-    devicePort = strtol(dp, &ptr, 10);
-    if (devicePort <= 0 || devicePort > 65535) {
-      fprintf(stderr, "invalid DEVICE_PORT: %s\n", pTmp);
-      return 1;
-    }
-  }
-
-  if ((pTmp = getenv("MACHINE_NAME")) != NULL) {
-    sprintf(machineName, "%s", pTmp);
-  }
-
-  if ((pTmp = getenv("KAFKA_BROKERS")) != NULL) {
-    brokers = (char *)malloc(strlen(pTmp) + 1);
-    strcpy(brokers, pTmp);
-  }
-
-  if ((pTmp = getenv("KAFKA_TOPIC")) != NULL) {
-    topic = (char *)malloc(strlen(pTmp) + 1);
-    strcpy(topic, pTmp);
-  }
-
-  return 0;
-}
-
 void intHandler(int sig) { runningCondition = 1; }
 
-int loop_setup(cJSON **updatesPtr, cJSON **metaPtr) {
-  atexit(cleanup);
-
-  *updatesPtr = cJSON_CreateObject();
-  *metaPtr = cJSON_CreateObject();
-
-  if (checkMachineInfo(*updatesPtr, *metaPtr)) {
-    fprintf(stderr, "failed to read machine info!\n");
-    return 1;
-  }
-
-  return 0;
-}
+/* generate kafka messages with properties
+ *  values: obj with key value machine properties
+ *  timestamp: match kafka msg time exactly
+ *  meta: map of api operation(s) to total duration (microseconds)
+ *
+ */
 
 int loop_tick(cJSON *updates, cJSON *meta) {
   if (checkMachinePartCount(updates, meta) ||
@@ -118,14 +76,26 @@ int main(int argc, char **argv) {
   rd_kafka_t *rk;        /* Producer instance handle */
   rd_kafka_conf_t *conf; /* Temporary configuration object */
   char errstr[512];      /* librdkafka API error reporting buffer */
+  char *cfg_file;
+  config_t cfg;
+  int port;
+  double interval;
 
-  setbuf(stdout, NULL);
+  setbuf(stdout, NULL);  // disable output buffering
 
-  if (setupEnv()) {
-    fprintf(stderr, "failed to configure environment variables\n");
-    exit(EXIT_FAILURE);
+  if (argc == 1) {
+    cfg_file = DEFAULT_CONFIG;
+  } else if (argc == 2) {
+    cfg_file = argv[1];
+  } else {
+    fprintf(stderr, "%% Usage: %s <config file>\n", argv[0]);
     return 1;
   }
+
+  if (read_config(cfg_file, &cfg)) {
+    fprintf(stderr, "failed to read config file\n");
+  }
+
   printf("using kafka brokers: \"%s\" and topic \"%s\"\n", brokers, topic);
 
   conf = rd_kafka_conf_new();
@@ -158,8 +128,13 @@ int main(int argc, char **argv) {
   signal(SIGINT, intHandler);
   signal(SIGTERM, intHandler);
 
-  if (loop_setup(&updates, &meta)) {
-    fprintf(stderr, "failed to setup loop\n");
+  atexit(cleanup);
+
+  updates = cJSON_CreateObject();
+  meta = cJSON_CreateObject();
+
+  if (checkMachineInfo(updates, meta)) {
+    fprintf(stderr, "failed to read machine info!\n");
     exit(EXIT_FAILURE);
     return 1;
   }
