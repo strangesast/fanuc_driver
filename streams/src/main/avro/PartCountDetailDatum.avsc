@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "namespace": "strangesast",
+  "name": "PartCountDetailDatum",
+  "fields": [
+    {"name": "machine_id", "type":  "string"},
+    {"name": "timestamp", "type":  "long"},
+    {"name": "offset", "type":  "long"},
+    {"name": "part_count", "type": "long"}
+  ]
+}

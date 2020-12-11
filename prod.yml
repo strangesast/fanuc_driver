@@ -8,7 +8,7 @@ services:
     volumes:
       - zookeeper_data:/opt/zookeeper-3.4.13/data
       - zookeeper_log:/opt/zookeeper-3.4.13/conf
-  kafka:
+  broker0:
     image: wurstmeister/kafka
     restart: always
     ports:
@@ -19,7 +19,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 #      KAFKA_CREATE_TOPICS: "input:6:1,values:6:1,state:6:1,execution:1:1"
       KAFKA_LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker0:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -41,7 +41,7 @@ services:
       context: .
       dockerfile: docker/streams/Dockerfile
     environment:
-      - KAFKA_HOSTS=kafka:29092
+      - KAFKA_HOSTS=broker0:29092
       - SCHEMA_REGISTRY_URL=http://schema-registry:8081
       - STREAMS_APPLICATION_ID=alt-streams-monitoring
   connect:
@@ -50,7 +50,7 @@ services:
       context: .
       dockerfile: docker/connect/Dockerfile
     environment:
-      - KAFKA_HOSTS=kafka:29092
+      - KAFKA_HOSTS=broker0:29092
       - SCHEMA_REGISTRY_URL=http://schema-registry:8081
       - DATABASE_URL=postgresql://postgres:5432/testing
       - FLUSH_INTERVAL=1000
@@ -60,12 +60,12 @@ services:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:29092'
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker0:29092'
   driver0:
     image: strangesast/fanuc_driver
     restart: unless-stopped
     environment:
-      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_BROKERS=broker0:29092
       - DEVICE_IP=10.0.0.200
     build:
       context: .
@@ -74,7 +74,7 @@ services:
     image: strangesast/fanuc_driver
     restart: unless-stopped
     environment:
-      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_BROKERS=broker0:29092
       - DEVICE_IP=10.0.0.207
     build:
       context: .
@@ -83,7 +83,7 @@ services:
     image: strangesast/fanuc_driver
     restart: unless-stopped
     environment:
-      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_BROKERS=broker0:29092
       - DEVICE_IP=10.0.0.208
     build:
       context: .
@@ -92,7 +92,7 @@ services:
     image: strangesast/fanuc_driver
     restart: unless-stopped
     environment:
-      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_BROKERS=broker0:29092
       - DEVICE_IP=10.0.0.209
     build:
       context: .
@@ -101,7 +101,7 @@ services:
     image: strangesast/fanuc_driver
     restart: unless-stopped
     environment:
-      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_BROKERS=broker0:29092
       - DEVICE_IP=10.0.0.206
     build:
       context: .
@@ -110,7 +110,7 @@ services:
     image: strangesast/fanuc_driver
     restart: unless-stopped
     environment:
-      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_BROKERS=broker0:29092
       - DEVICE_IP=10.0.0.112
     build:
       context: .

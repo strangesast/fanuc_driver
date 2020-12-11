@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "namespace": "strangesast",
+  "name": "PartCompletedEventDatum",
+  "fields": [
+    {"name": "machine_id", "type":  "string"},
+    {"name": "timestamp", "type":  "long"},
+    {"name": "offset", "type":  "long"},
+    {"name": "part_count", "type": "long"},
+    {"name": "part_count_timestamp", "type": "long"},
+    {"name": "program", "type": "string"},
+    {"name": "program_hash", "type": "string"},
+    {"name": "program_timestamp", "type": "long"}
+  ]
+}
