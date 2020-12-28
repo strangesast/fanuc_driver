@@ -60,8 +60,11 @@ async def main():
             async for msg in consumer:
                 try:
                     v = json.loads(msg.value)
+                except UnicodeDecodeError:
+                    continue
                 except json.JSONDecodeError:
                     continue
+
 
                 vv = tr(msg, v)
                 try:
@@ -79,7 +82,7 @@ async def main():
                     q.task_done()
                 except asyncio.QueueEmpty:
                     if len(to_insert):
-                        print(f"inserting... {len(to_insert)}")
+                        print(f"inserting... {len(to_insert)} {to_insert[-1][2]}")
                         await conn.executemany(query, to_insert)
                         to_insert = []
 

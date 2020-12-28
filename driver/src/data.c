@@ -401,7 +401,7 @@ int getMachineProgramContents(MachineProgramContents *v, char *programPath) {
   short ret;
   short type = 0;     // NC Program
   long chunk = 1280;  // must be multiple of 256
-  char buf[2048];
+  char buf[2048] = "";
   long len;
   char *prog = NULL;
   struct timespec t0, t1;
@@ -493,15 +493,13 @@ int getMachineBlock(MachineBlock *v) {
   }
   clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
 
-  buf[len] = '\0';
   for (int i = 0; i < len; i++) {
     if (buf[i] == '\n') {
       buf[i] = '\0';
       break;
     }
   }
-
-  strncpy(v->block, buf, len - 1);
+  snprintf(v->block, len, "%s", buf);
 
   tt = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000;
   v->executionDuration = tt;
